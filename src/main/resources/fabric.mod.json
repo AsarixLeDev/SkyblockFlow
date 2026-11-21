@@ -1,0 +1,31 @@
+{
+  "schemaVersion": 1,
+  "id": "skyblockflow",
+  "version": "${version}",
+  "name": "SkyblockFlow",
+  "description": "Gameplay companion for Excalia: job and pet tracking, manual leaderboards, spawner ranges, waypoints, cinematic edits and flexible overlays.",
+  "icon": "assets/skyblockflow/icon.png",
+  "contact": {
+    "sources": "https://github.com/AsarixLeDev/SkyblockFlow",
+    "issues": "https://github.com/AsarixLeDev/SkyblockFlow/issues"
+  },
+  "authors": [
+    "Asarix"
+  ],
+  "license": "MIT",
+  "environment": "client",
+  "entrypoints": {
+    "client": [
+      "dev.asarix.skyblockflow.SkyblockFlowClient"
+    ]
+  },
+  "mixins": [
+    "skyblockflow.mixins.json"
+  ],
+  "depends": {
+    "fabricloader": ">=0.19.3",
+    "minecraft": "~26.2",
+    "java": ">=25",
+    "fabric-api": "*"
+  }
+}

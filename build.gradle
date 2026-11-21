@@ -1,0 +1,132 @@
+plugins {
+    id 'net.fabricmc.fabric-loom' version '1.17.21'
+}
+version = project.mod_version
+group = project.maven_group
+base { archivesName = project.archives_base_name }
+repositories { mavenCentral() }
+def generatedMinecraftRepositories = ['LoomGlobalMinecraft', 'LoomLocalMinecraft'].collect { name ->
+    def repository = repositories.getByName(name)
+    if (repository.url.scheme != 'file') throw new GradleException('Generated Minecraft artifacts require a local repository')
+    repository
+}
+repositories.exclusiveContent {
+    forRepositories(*generatedMinecraftRepositories)
+    filter { includeGroup 'net.minecraft' }
+}
+loom {
+    splitEnvironmentSourceSets()
+    mods {
+        skyblockflow {
+            sourceSet sourceSets.main
+            sourceSet sourceSets.client
+        }
+    }
+}
+dependencies {
+    minecraft "com.mojang:minecraft:${project.minecraft_version}"
+    implementation "net.fabricmc:fabric-loader:${project.loader_version}"
+    implementation "net.fabricmc.fabric-api:fabric-api:${project.fabric_api_version}"
+    include implementation('javazoom:jlayer:1.0.1')
+    include implementation('org.jsoup:jsoup:1.24.1')
+    testImplementation platform('org.junit:junit-bom:5.13.4')
+    testImplementation 'org.junit.jupiter:junit-jupiter'
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+}
+processResources {
+    inputs.property 'version', project.version
+    filesMatching('fabric.mod.json') { expand 'version': project.version }
+    inputs.property 'discordClientId', providers.gradleProperty('discord_client_id').orElse('')
+    inputs.property 'discordRedirectUri', providers.gradleProperty('discord_redirect_uri').orElse('http://127.0.0.1:48533/callback')
+    inputs.property 'discordEnabled', providers.gradleProperty('discord_connection_enabled').orElse('false')
+    filesMatching('discord-public.properties') {
+        expand discordEnabled: providers.gradleProperty('discord_connection_enabled').getOrElse('false'),
+            discordClientId: providers.gradleProperty('discord_client_id').getOrElse(''),
+            discordRedirectUri: providers.gradleProperty('discord_redirect_uri').getOrElse('http://127.0.0.1:48533/callback')
+    }
+}
+tasks.withType(JavaCompile).configureEach { options.release = 25 }
+java {
+    withSourcesJar()
+    sourceCompatibility = JavaVersion.VERSION_25
+    targetCompatibility = JavaVersion.VERSION_25
+}
+test { useJUnitPlatform() }
+tasks.named('jar') {
+    from('LICENSE')
+    from('third-party') { into 'META-INF/skyblockflow-third-party' }
+}
+if (file("src/gametest").isDirectory()) {
+fabricApi {
+    configureTests {
+        createSourceSet = true
+        modId = 'skyblockflow-test'
+        enableGameTests = false
+        enableClientGameTests = true
+    }
+}
+
+// Select one client integration scenario without changing the test mod manifest.
+tasks.named('processGametestResources') {
+    inputs.property('clientTest', providers.gradleProperty('clientTest').orElse('all'))
+    doLast {
+        if (project.hasProperty('clientTest')) {
+            def manifest = new File(destinationDir, 'fabric.mod.json')
+            def json = new groovy.json.JsonSlurper().parse(manifest)
+            def selected = project.property('clientTest').toString().split(',') as List
+            def tests = json.entrypoints['fabric-client-gametest'].findAll { entry -> selected.any { entry.endsWith('.' + it) } }
+            if (tests.isEmpty()) throw new GradleException('Unknown clientTest')
+            json.entrypoints['fabric-client-gametest'] = tests
+            manifest.text = groovy.json.JsonOutput.prettyPrint(groovy.json.JsonOutput.toJson(json))
+        }
+    }
+}
+
+}
+
+// Public builds may enable Discord only after the live integration checks pass.
+tasks.register('verifyDiscordRelease') {
+    doLast {
+        if (!(providers.gradleProperty('discord_client_id').getOrElse('') ==~ /[0-9]{10,25}/))
+            throw new GradleException('Configure the publisher Discord application ID first.')
+        if (providers.gradleProperty('discord_connection_enabled').getOrElse('false') == 'true'
+            && providers.gradleProperty('discord_public_ready').getOrElse('false') != 'true')
+            throw new GradleException('Discord public release is blocked: complete DISCORD-RELEASE.md and verify non-tester access first.')
+    }
+}
+tasks.register('publicRelease') {
+    dependsOn 'verifyDiscordRelease', 'build'
+}
+
+// Compile the source artwork to a glyph that fits Minecraft's 256-pixel font atlas.
+def badgeAssets = layout.buildDirectory.dir('generated/badgeAssets')
+tasks.register('prepareNameBadge') {
+    inputs.file('src/main/badge-art/sf-badge.png')
+    outputs.dir(badgeAssets)
+    doLast {
+        def source = javax.imageio.ImageIO.read(file('src/main/badge-art/sf-badge.png'))
+        int left = source.width, top = source.height, right = -1, bottom = -1
+        for (int y = 0; y < source.height; y++) for (int x = 0; x < source.width; x++) {
+            if (((source.getRGB(x, y) >>> 24) & 255) > 32) {
+                left = Math.min(left, x); top = Math.min(top, y)
+                right = Math.max(right, x); bottom = Math.max(bottom, y)
+            }
+        }
+        if (right < left) throw new GradleException('The SF badge artwork is empty')
+        int targetWidth = 64
+        int targetHeight = Math.max(2, Math.round(62f * (bottom - top + 1) / (right - left + 1))) + 2
+        def sprite = new java.awt.image.BufferedImage(targetWidth, targetHeight, java.awt.image.BufferedImage.TYPE_INT_ARGB)
+        def graphics = sprite.createGraphics()
+        try {
+            graphics.setRenderingHint(java.awt.RenderingHints.KEY_INTERPOLATION, java.awt.RenderingHints.VALUE_INTERPOLATION_BILINEAR)
+            graphics.drawImage(source, 1, 1, targetWidth - 1, targetHeight - 1, left, top, right + 1, bottom + 1, null)
+        } finally { graphics.dispose() }
+        def output = badgeAssets.get().file('assets/skyblockflow/textures/font/sf_badge.png').asFile
+        output.parentFile.mkdirs()
+        javax.imageio.ImageIO.write(sprite, 'PNG', output)
+    }
+}
+tasks.named('processResources') {
+    dependsOn 'prepareNameBadge'
+    from(badgeAssets)
+}

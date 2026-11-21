@@ -1,0 +1,18 @@
+{
+  "key.skyblockflow.measure": "Measure current job leaderboard",
+  "key.skyblockflow.measure_all": "Measure all job leaderboards",
+  "key.skyblockflow.advance": "Open next leaderboard command",
+  "key.skyblockflow.editor": "Open feature browser",
+  "key.categories.skyblockflow.controls": "SkyblockFlow",
+  "key.skyblockflow.bindings": "Open command keybinds",
+  "key.skyblockflow.coordinates": "Open coordinate sounds",
+  "key.categories.skyblockflow.spawners": "SkyblockFlow Spawners",
+  "key.skyblockflow.spawner_highlight": "Toggle spawner highlights",
+  "key.skyblockflow.spawner_spheres": "Toggle spawner radius vision",
+  "key.categories.skyblockflow.recipes": "Recipes",
+  "key.skyblockflow.recipe.recipes": "View recipes",
+  "key.skyblockflow.recipe.uses": "View uses",
+  "key.skyblockflow.recipe.pin": "Pin or unpin recipe",
+  "key.skyblockflow.recipe.materials": "Calculate raw materials",
+  "key.skyblockflow.recipe.craft": "Place recipe or show crafting guide"
+}

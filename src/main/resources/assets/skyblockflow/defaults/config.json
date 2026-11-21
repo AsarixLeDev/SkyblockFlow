@@ -1,0 +1,195 @@
+{
+  "version": 2,
+  "connectionGraceMs": 60000,
+  "features": {
+    "CHAT": {
+      "enabled": true,
+      "hideWithF11": true
+    },
+    "COORDINATES": {
+      "enabled": true,
+      "hideWithF11": true
+    },
+    "COMMANDS": {
+      "enabled": true,
+      "hideWithF11": true
+    },
+    "OVERLAY": {
+      "enabled": true,
+      "hideWithF11": true
+    },
+    "JOBS": {
+      "enabled": true,
+      "hideWithF11": true
+    },
+    "PETS": {
+      "enabled": true,
+      "hideWithF11": true
+    },
+    "TIMERS": {
+      "enabled": true,
+      "hideWithF11": true
+    }
+  },
+  "jobs": {
+    "timeoutMs": 300000,
+    "rateWindowMs": 60000,
+    "experimentalXp": true,
+    "unhideAfterIdleMs": 10000,
+    "closest": {
+      "hideOutput": true,
+      "commandGapMs": 2000,
+      "responseTimeoutMs": 10000,
+      "maxPages": 30
+    },
+    "celebration": {
+      "enabled": true,
+      "animated": true,
+      "fireworks": true,
+      "durationMs": 4000,
+      "text": "LEVEL {level} · {job}",
+      "subtitle": "One level closer to the stars!",
+      "image": "",
+      "edit": {
+        "enabled": false,
+        "volumeMultiplier": 1.0,
+        "zoom": 1.5,
+        "shakeDegrees": 0.35,
+        "shakeHz": 1.0,
+        "rollDegrees": 0.2,
+        "bassReactive": true,
+        "bassLowHz": 10.0,
+        "bassHighHz": 50.0,
+        "bassThreshold": 0.035,
+        "beatCooldownMs": 180,
+        "attackMs": 500,
+        "releaseMs": 3000,
+        "motionMultiplier": 4.0,
+        "fadeInMs": 100,
+        "fadeOutMs": 1000,
+        "beatZoom": true,
+        "colorGrade": true,
+        "vignette": true,
+        "lightPulse": false,
+        "letterbox": false,
+        "tintStrength": 0.08,
+        "vignetteStrength": 0.22,
+        "tintColor": 10204927,
+        "pulseStrength": 0.06,
+        "letterboxHeight": 0.08,
+        "analysisHz": 100,
+        "syncOffsetMs": 0,
+        "punchEnabled": true,
+        "punchMs": 120,
+        "punchStrength": 0.35,
+        "cameraReturn": true,
+        "bassDetectionMode": "ALL_BASS"
+      },
+      "soundKind": "VANILLA",
+      "sound": "minecraft:entity.player.levelup",
+      "volume": 0.5,
+      "pitch": 1.0,
+      "hideMinecraftHud": false,
+      "showCard": true
+    },
+    "showClosestXp": true,
+    "showClosestTime": true,
+    "colors": {
+      "background": 1121321,
+      "accent": 7987134,
+      "text": 15199733,
+      "muted": 10201789
+    },
+    "showOverlay": true,
+    "onlyActive": false,
+    "showProgress": true,
+    "showSession": true,
+    "showPerMinute": true,
+    "showPerHour": true,
+    "showNextLevel": true,
+    "showMilestone": true,
+    "showLevel200": true,
+    "pinnedJob": "",
+    "x": 0.98,
+    "y": 0.12,
+    "scale": 0.8,
+    "opacity": 0.82
+  },
+  "timers": [],
+  "copyChatOnClick": true,
+  "pets": {
+    "showOverlay": true,
+    "hideNoPet": true,
+    "hideNoData": true,
+    "warnHungry": true,
+    "x": 0.98,
+    "y": 0.65,
+    "scale": 0.8,
+    "opacity": 0.82,
+    "colors": {
+      "background": 1121321,
+      "accent": 7987134,
+      "text": 15199733,
+      "muted": 10201789
+    },
+    "warningCooldownMs": 60000,
+    "warningXp": {}
+  },
+  "autoServerProfiles": false,
+  "profileName": "default",
+  "alerts": [
+    {
+      "id": "skill-ready",
+      "name": "Skill ready",
+      "enabled": true,
+      "mode": "TEMPLATE",
+      "pattern": "[skill] est à nouveau disponible.",
+      "caseSensitive": false,
+      "matchFullChat": false,
+      "title": "Skill [skill] can be used again",
+      "subtitle": "",
+      "cooldownMs": 1000,
+      "soundKind": "VANILLA",
+      "sound": "minecraft:block.note_block.pling",
+      "volume": 0.5,
+      "pitch": 1.0
+    },
+    {
+      "id": "private-message",
+      "name": "Message privé",
+      "enabled": true,
+      "mode": "TEMPLATE",
+      "pattern": "[[player] -> me] [msg]",
+      "caseSensitive": false,
+      "matchFullChat": false,
+      "title": "Message de [player]",
+      "subtitle": "Vous avez reçu un message privé.",
+      "cooldownMs": 1000,
+      "soundKind": "VANILLA",
+      "sound": "minecraft:block.note_block.pling",
+      "volume": 0.5,
+      "pitch": 1.0
+    },
+    {
+      "id": "pet-hungry",
+      "name": "Hungry pet",
+      "enabled": true,
+      "mode": "TEMPLATE",
+      "pattern": "⌈ ᴘᴇᴛꜱ ⌉ Votre pet a faim, plus aucun effet actif. Nourrissez-le avec /pets.",
+      "caseSensitive": false,
+      "matchFullChat": false,
+      "title": "Your pet is hungry",
+      "subtitle": "you lost its boost",
+      "cooldownMs": 1000,
+      "soundKind": "VANILLA",
+      "sound": "minecraft:block.note_block.pling",
+      "volume": 0.5,
+      "pitch": 1.0
+    }
+  ],
+  "commandBindings": [],
+  "coordinateAlerts": [],
+  "hideFeatures": false,
+  "alarmStyles": {},
+  "defaultAlertsVersion": 1
+}

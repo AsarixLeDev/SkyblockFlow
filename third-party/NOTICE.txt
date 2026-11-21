@@ -1,0 +1,25 @@
+SkyblockFlow bundles the unmodified JLayer 1.0.1 library by JavaZoom and its
+contributors for MP3 decoding and playback. JLayer is licensed under the
+GNU Library General Public License version 2 or later; it is distributed
+here under LGPL 2.1. SkyblockFlow's own source is licensed separately under MIT.
+
+The LGPL 2.1 text is in JLAYER-LICENSE.txt. Corresponding JLayer sources are
+included as jlayer-1.0.1-sources.jar, obtained from:
+https://repo.maven.apache.org/maven2/javazoom/jlayer/1.0.1/jlayer-1.0.1-sources.jar
+
+JLayer is included as a separate nested JAR under META-INF/jars in the mod,
+not merged into SkyblockFlow classes. It can be replaced with a compatible
+modified JAR and the mod can be rebuilt with Gradle. The source project and
+build configuration are included in the release source archive. No terms
+of SkyblockFlow prohibit modification or reverse engineering for debugging
+changes to this LGPL library.
+
+
+Discord logo from Simple Icons (CC0). Discord is a trademark of Discord Inc.
+
+SkyblockFlow bundles jsoup 1.24.1, Copyright Jonathan Hedley, under MIT.
+See JSOUP-LICENSE.txt. Source: https://jsoup.org/
+
+Optional Rocket League match data comes from Liquipedia (CC BY-SA 3.0);
+team logos retain their respective owners' rights. Attribution and source
+link are shown in the overlay. https://liquipedia.net/rocketleague/Main_Page

@@ -1,0 +1,13 @@
+{
+  "providers": [
+    {
+      "type": "bitmap",
+      "file": "skyblockflow:font/sf_badge.png",
+      "height": 9,
+      "ascent": 8,
+      "chars": [
+        "\uefc0"
+      ]
+    }
+  ]
+}

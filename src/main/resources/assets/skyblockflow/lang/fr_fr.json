@@ -1,0 +1,12 @@
+{
+  "key.skyblockflow.editor": "Ouvrir les fonctionnalités",
+  "key.categories.skyblockflow.controls": "SkyblockFlow",
+  "key.skyblockflow.bindings": "Ouvrir les raccourcis de commandes",
+  "key.skyblockflow.coordinates": "Ouvrir les sons de coordonnées",
+  "key.categories.skyblockflow.recipes": "Recettes",
+  "key.skyblockflow.recipe.recipes": "Voir les recettes",
+  "key.skyblockflow.recipe.uses": "Voir les utilisations",
+  "key.skyblockflow.recipe.pin": "Épingler une recette",
+  "key.skyblockflow.recipe.materials": "Calculer les ressources brutes",
+  "key.skyblockflow.recipe.craft": "Placer la recette ou afficher le guide"
+}

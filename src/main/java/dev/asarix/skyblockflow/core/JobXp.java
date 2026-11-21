@@ -1,0 +1,194 @@
+package dev.asarix.skyblockflow.core;
+
+import java.text.Normalizer;
+import java.util.*;
+import java.util.regex.*;
+
+/** Excalia season 3 wiki curves, with inferred late-level adjustments for three jobs. */
+public final class JobXp {
+  public static final Map<String, String> NAMES = new LinkedHashMap<>();
+
+  static {
+    NAMES.put("mineur", "Mineur");
+    NAMES.put("bucheron", "Bûcheron");
+    NAMES.put("fermier", "Fermier");
+    NAMES.put("chasseur", "Chasseur");
+    NAMES.put("artisan", "Artisan");
+    NAMES.put("aventurier", "Aventurier");
+    NAMES.put("pecheur", "Pêcheur");
+  }
+
+  private static final String NUMBER = "([0-9][0-9 .,']*)";
+  private static final Pattern BAR =
+      Pattern.compile(
+          "(?<![a-z])(mineur|bucheron|fermier|chasseur|artisan|aventurier|pecheur)\\b[^0-9]*niveau\\s*([0-9]{1,3})[^0-9]*"
+              + NUMBER
+              + "\\s*/\\s*"
+              + NUMBER
+              + "\\s*xp(?:\\s*\\(\\s*\\+\\s*"
+              + NUMBER
+              + "\\s*\\))?");
+
+  public record Reading(String job, int level, double xp, double required, double gain) {}
+
+  /**
+   * Labels verified against Excalia's downloaded Oraxen font atlas, November 11, 2026. These are
+   * whole-word images, not letters. Decode before Unicode normalization.
+   */
+  public static String decodeGlyphs(String text) {
+    StringBuilder result = new StringBuilder();
+    for (int cp : text.codePoints().toArray()) {
+      String word =
+          switch (cp) {
+            case 0xf740 -> "mineur";
+            case 0xf741 -> "bucheron";
+            case 0xf742 -> "fermier";
+            case 0xf743 -> "chasseur";
+            case 0xf744 -> "artisan";
+            case 0xf745 -> "aventurier";
+            case 0xf746 -> "niveau";
+            case 0xf747 -> "xp";
+            case 0xf749 -> "pecheur";
+            default -> null;
+          };
+      if (word == null) result.appendCodePoint(cp);
+      else result.append(' ').append(word).append(' ');
+    }
+    return result.toString();
+  }
+
+  public static String normalize(String text) {
+    String small = "ᴀʙᴄᴅᴇꜰɢʜɪᴊᴋʟᴍɴᴏᴘǫʀꜱᴛᴜᴠᴡʏᴢ";
+    String normal = "abcdefghijklmnopqrstuvwyz";
+    StringBuilder result = new StringBuilder();
+    // Map small caps first: NFKD would decompose the server's small-cap Q (ǫ) to O.
+    for (char c : decodeGlyphs(text).replaceAll("§[0-9a-fk-orxA-FK-ORX]", "").toCharArray()) {
+      int i = small.indexOf(c);
+      result.append(i >= 0 ? normal.charAt(i) : Character.isSpaceChar(c) ? ' ' : c);
+    }
+    return Normalizer.normalize(result, Normalizer.Form.NFKD)
+        .replaceAll("\\p{M}+", "").toLowerCase(Locale.ROOT);
+  }
+
+  public static Reading parse(String text) {
+    if (text == null || text.length() > 4096) return null;
+    Matcher m = BAR.matcher(normalize(text));
+    if (!m.find()) return null;
+    try {
+      int level = Integer.parseInt(m.group(2));
+      double xp = number(m.group(3)), required = number(m.group(4));
+      double gain = m.group(5) == null ? 0 : number(m.group(5));
+      if (level > 200
+          || required < 0
+          || (required == 0 && level != 200)
+          || xp < 0
+          || (level < 200 && xp > required + .01)
+          || !Double.isFinite(xp + required + gain)
+          || required > 1e12
+          || gain > 1e12) return null;
+      return new Reading(m.group(1), level, xp, required, gain);
+    } catch (NumberFormatException e) {
+      return null;
+    }
+  }
+
+  private static double number(String s) {
+    s = s.strip().replace(" ", "").replace("'", "");
+    // With both separators, the rightmost is decimal; otherwise comma is decimal.
+    if (s.contains(",") && s.contains(".")) {
+      if (s.lastIndexOf(',') > s.lastIndexOf('.')) s = s.replace(".", "").replace(',', '.');
+      else s = s.replace(",", "");
+    } else s = s.replace(',', '.');
+    return Double.parseDouble(s);
+  }
+
+  public static long requirement(String job, int level) {
+    if (level < 0 || level >= 200) return 0;
+    // Fishing has its own published curve: /wiki/s3-peche/le-niveau-de-pecheur-1-200.
+    if (job.equals("pecheur")) return (long) Math.floor(100 * Math.pow(level, 1.6));
+    if (job.equals("artisan")) return (long) Math.floor(10 + .033153 * Math.pow(level, 3));
+    double a, b, c;
+    switch (job) {
+      case "mineur" -> {
+        a = 1.9343;
+        b = 2765;
+        c = 56.0057;
+      }
+      case "bucheron" -> {
+        a = 1.9345;
+        b = 2765;
+        c = 56.0053;
+      }
+      case "fermier" -> {
+        a = 1.936;
+        b = 2767;
+        c = 56.0015;
+      }
+      case "chasseur" -> {
+        a = 1.9345;
+        b = 2765;
+        c = 1.1876;
+      }
+      case "aventurier" -> {
+        a = 1.9336;
+        b = 2764;
+        c = 2.1625;
+      }
+      default -> {
+        return -1;
+      }
+    }
+    double xp =
+        1 + a * Math.pow(level, 1.7281) + (level >= 100 ? b + c * Math.pow(level - 100, 2) : 0);
+    if (level > 150) {
+      xp += inferredCoefficient(job) * Math.pow(level - 150, 4);
+    }
+    return (long) Math.floor(xp);
+  }
+
+  // Inferred on 2026-11-12. The wiki omits this term; unobserved levels are estimates.
+  static double inferredCoefficient(String job) {
+    return switch (job) {
+      case "chasseur" -> .0551; // Levels 183, 184, 185: 92006, 100641, 110043 XP.
+      case "bucheron" -> .214793; // Level 176: 439098 XP. Retain all six decimal places.
+      case "fermier" -> .1650; // Level 154: 177783 XP. One observation allows a wider range.
+      default -> 0;
+    };
+  }
+
+  public static int milestone(int level) {
+    return Math.min(200, (level / 5 + 1) * 5);
+  }
+
+  public static double remaining(String job, int level, double xp, double required, int target) {
+    if (level >= target) return 0;
+    double remaining = Math.max(0, required - xp);
+    for (int l = level + 1; l < Math.min(200, target); l++) {
+      long cost = requirement(job, l);
+      if (cost < 0) return Double.NaN;
+      remaining += cost;
+    }
+    return remaining;
+  }
+
+  public static String eta(double remaining, double perMinute) {
+    if (!Double.isFinite(remaining)) return "Curve unavailable";
+    if (remaining <= 0) return "00:00:00";
+    if (!Double.isFinite(perMinute) || perMinute <= 0) return "Collecting XP…";
+    return duration((long) Math.ceil(remaining / perMinute * 60000));
+  }
+
+  public static String duration(long millis) {
+    long seconds = Math.max(0, millis) / 1000;
+    return String.format(
+        Locale.ROOT, "%02d:%02d:%02d", seconds / 3600, seconds / 60 % 60, seconds % 60);
+  }
+
+  public static String amount(double xp) {
+    return Numbers.fixed(xp, 2);
+  }
+
+  public static String name(String job) {
+    return NAMES.getOrDefault(job, job);
+  }
+}
