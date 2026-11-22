@@ -38,7 +38,17 @@ public final class RecipeCatalog {
     public boolean complete() { return needed <= present; }
   }
 
-  public record Checklist(List<Material> materials, boolean limited) {}
+  public record Checklist(List<Material> materials, boolean limited) {
+    public Checklist {
+      materials = materials.stream().sorted(Comparator.comparing(Material::complete)).toList();
+    }
+
+    public static int rows(int height) { return Math.max(1, (height - 34) / 19); }
+
+    public int offset(int height, int requested) {
+      return Math.clamp(requested, 0, Math.max(0, materials.size() - rows(height)));
+    }
+  }
 
   private final Map<String, Recipe> recipes = new LinkedHashMap<>();
   private final Map<String, List<Recipe>> outputs = new HashMap<>();

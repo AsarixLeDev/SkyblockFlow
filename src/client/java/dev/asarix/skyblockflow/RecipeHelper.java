@@ -577,8 +577,9 @@ public final class RecipeHelper {
     Recipe recipe = materialRecipe();
     if (recipe == null || width < 55 || height < 32) return;
     var materials = checklist();
+    offset = materials.offset(height, offset);
     int total = materials.materials().size();
-    int rows = Math.min(Math.max(1, (height - 34) / 19), Math.max(0, total - offset));
+    int rows = Math.min(Checklist.rows(height), Math.max(0, total - offset));
     Ui.surface(g, x, y, width, 34 + rows * 19, FlowScreen.CARD, FlowScreen.BORDER);
     Ui.text(g, Ui.trim(name(recipe.output()) + " ×" + (long) recipe.amount() * settings().batches,
         width - 14), x + 7, y + 6, FlowScreen.ACCENT);
@@ -596,6 +597,8 @@ public final class RecipeHelper {
         : offset + rows < total ? "+" + (total - offset - rows) + " more"
         : settings().includeContainer ? "Inventory + open storage" : "Inventory";
     Ui.text(g, Ui.trim(footer, width - 14), x + 7, y + 20 + rows * 19, FlowScreen.MUTED);
+    if (total > rows)
+      Ui.scrollBar(g, x + width - 3, y + 19, rows * 19, total * 19, offset * 19);
   }
 
   public boolean inspectOutside() { return settings().inspection == Inspection.EVERYWHERE; }
@@ -690,20 +693,26 @@ public final class RecipeHelper {
           prices.add(ShopPrices.line("Shop", quote.buy(), quote.sell(), quote.unit(), stack.getCount()));
       }
     }
-    if (prices.isEmpty() && allowReference && data != null)
-      for (var quote : data.prices()) {
+    var publicPrices = app.excaliaApi == null ? List.<SeasonThreeCatalog.ShopQuote>of() : app.excaliaApi.prices(key(stack));
+    var referencePrices = !publicPrices.isEmpty() ? publicPrices : data == null ? List.<SeasonThreeCatalog.ShopQuote>of() : data.prices();
+    if (prices.isEmpty() && allowReference)
+      for (var quote : referencePrices) {
         var level = app.jobs.tracker.data.jobs.get(quote.shop());
         var sell = quote.sell();
         if (sell != null && level != null && onExcalia()) sell = ShopValue.unit(sell, level.level);
-        prices.add(ShopPrices.line("S3 " + quote.shop(), quote.buy(), sell, quote.unit(), stack.getCount()));
+        prices.add(ShopPrices.line(!publicPrices.isEmpty() ? app.excaliaApi.priceSource(quote.shop()) : "S3 " + quote.shop(), quote.buy(), sell, quote.unit(), stack.getCount()));
       }
+    if (app.excaliaApi != null && !stack.isEnchanted() && !stack.isDamaged()
+        && stack.get(DataComponents.POTION_CONTENTS) == null)
+      prices.addAll(app.excaliaApi.market(key(stack), stack.getHoverName().getString(), stack.getCount()));
     return prices;
   }
 
   public List<String> shopReference(String id) {
     var data = season.items().get(id);
-    if (data == null) return List.of();
-    return data.prices().stream().map(quote ->
-        ShopPrices.line("S3 " + quote.shop(), quote.buy(), quote.sell(), quote.unit(), 1)).toList();
+    var live = app.excaliaApi == null ? List.<SeasonThreeCatalog.ShopQuote>of() : app.excaliaApi.prices(id);
+    var prices = !live.isEmpty() ? live : data == null ? List.<SeasonThreeCatalog.ShopQuote>of() : data.prices();
+    return prices.stream().map(quote ->
+        ShopPrices.line(!live.isEmpty() ? app.excaliaApi.priceSource(quote.shop()) : "S3 " + quote.shop(), quote.buy(), quote.sell(), quote.unit(), 1)).toList();
   }
 }

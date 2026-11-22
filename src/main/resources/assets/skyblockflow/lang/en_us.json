@@ -1,4 +1,17 @@
 {
+  "skyblockflow.migration.title": "Import ExcaliaFlow settings?",
+  "skyblockflow.migration.description": "Import settings, waypoints, history and media from %s? Your current SkyblockFlow folder will be backed up.",
+  "skyblockflow.migration.import": "Import settings",
+  "skyblockflow.migration.keep_current": "Keep current settings",
+  "skyblockflow.migration.copying": "Importing settings…",
+  "skyblockflow.migration.imported": "Settings imported and loaded",
+  "skyblockflow.migration.delete_description": "The imported settings are active. Your previous SkyblockFlow folder is backed up in config/%s. Delete the original folder at %s?",
+  "skyblockflow.migration.delete": "Delete old folder",
+  "skyblockflow.migration.keep_old": "Keep old folder",
+  "skyblockflow.migration.deleting": "Deleting the old folder…",
+  "skyblockflow.migration.decline_error": "Could not save your choice. %s",
+  "skyblockflow.migration.import_error": "Could not import the old settings. %s",
+  "skyblockflow.migration.delete_error": "Settings were imported. The old folder could not be fully deleted. %s",
   "key.skyblockflow.measure": "Measure current job leaderboard",
   "key.skyblockflow.measure_all": "Measure all job leaderboards",
   "key.skyblockflow.advance": "Open next leaderboard command",
@@ -14,5 +27,12 @@
   "key.skyblockflow.recipe.uses": "View uses",
   "key.skyblockflow.recipe.pin": "Pin or unpin recipe",
   "key.skyblockflow.recipe.materials": "Calculate raw materials",
-  "key.skyblockflow.recipe.craft": "Place recipe or show crafting guide"
+  "key.skyblockflow.recipe.craft": "Place recipe or show crafting guide",
+  "skyblockflow.migration.source_title": "Import ExcaliaFlow folder",
+  "skyblockflow.migration.source_description": "Drop the old excaliaflow folder or excaliaflow.json here, or paste its path.",
+  "skyblockflow.migration.source_disconnect": "Choose the old folder first. You’ll disconnect before confirming the import.",
+  "skyblockflow.migration.source_disconnect_continue": "Disconnect and review import",
+  "skyblockflow.migration.source_folder": "Old configuration folder or file",
+  "skyblockflow.migration.source_continue": "Review import",
+  "skyblockflow.migration.source_missing": "Choose an excaliaflow folder that contains excaliaflow.json."
 }

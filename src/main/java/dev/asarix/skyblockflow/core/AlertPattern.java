@@ -9,11 +9,15 @@ import java.util.regex.*;
 public final class AlertPattern {
   private static final Pattern TOKEN = Pattern.compile("\\[([A-Za-z][A-Za-z0-9]*|[0-9]+)\\]");
   private final Pattern pattern;
+  private final boolean skillReady;
 
   public AlertPattern(AlertRule rule) {
     if (rule.pattern.isBlank()) throw new IllegalArgumentException("Enter a pattern first");
     if (rule.pattern.length() > 2048) throw new IllegalArgumentException("Pattern is too long");
     String source = rule.pattern;
+    skillReady = rule.mode == MatchMode.TEMPLATE
+        && DefaultChatAlerts.SKILL_READY_ID.equals(rule.id)
+        && DefaultChatAlerts.SKILL_READY_PATTERN.equals(source);
     if (rule.mode == MatchMode.TEMPLATE) {
       StringBuilder out = new StringBuilder("^");
       Matcher tokens = TOKEN.matcher(source);
@@ -40,7 +44,8 @@ public final class AlertPattern {
 
   public Map<String, String> match(String message, String sender) {
     if (message.length() > 4096) return null;
-    Matcher m = pattern.matcher(new BudgetText(message));
+    String input = skillReady ? ServerText.regularLetters(message).strip() : message;
+    Matcher m = pattern.matcher(new BudgetText(input));
     if (!m.find()) return null;
     Map<String, String> vars = new LinkedHashMap<>();
     for (int i = 0; i <= m.groupCount(); i++)

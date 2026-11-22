@@ -142,13 +142,22 @@ public final class JobService implements ClientboundBossEventPacket.Handler {
   }
 
   public void accept(Component text, String source) {
+    String raw = text.getString();
+    accept(raw, JobXp.parse(raw), source);
+  }
+
+  public void fishingMessage(String raw) {
+    var reading = JobXp.fishingMessage(raw);
+    if (reading != null) accept(raw, reading, "Fishing chat");
+  }
+
+  private void accept(String raw, JobXp.Reading reading, String source) {
     if (store == null && Minecraft.getInstance().player != null) connect();
     syncActionWorld();
-    String raw = text.getString();
     String normalized = JobXp.normalize(raw.length() > 4096 ? raw.substring(0, 4096) : raw);
-    var reading = JobXp.parse(raw);
+    boolean actionBar = source.equals("Action bar");
     if (source.equals("Boss bar")) bossTitles++;
-    else actionBars++;
+    if (actionBar) actionBars++;
     if (reading != null) matches++;
     String sample =
         source
@@ -167,13 +176,13 @@ public final class JobService implements ClientboundBossEventPacket.Handler {
     if (!app.store.config.enabled(Feature.JOBS)) return;
     long now = System.currentTimeMillis();
     dirty |= tracker.expire(now, app.store.config.jobs.timeoutMs);
-    if (source.equals("Action bar") && tracker.activeSessions() > 1) {
-      actionXp.reset();
-      return;
-    }
     if (reading == null) {
-      if (source.equals("Action bar")) actionXp.petMultiplier(app.pets.tracker.jobMultiplier(actionXp.job(), now));
-      if (source.equals("Action bar")
+      if (actionBar && tracker.activeSessions() > 1) {
+        actionXp.reset();
+        return;
+      }
+      if (actionBar) actionXp.petMultiplier(app.pets.tracker.jobMultiplier(actionXp.job(), now));
+      if (actionBar
           && app.store.config.jobs.experimentalXp
           && actionXp.sample(raw, now))
         status = "Tracking " + JobXp.name(actionXp.job());
@@ -206,6 +215,14 @@ public final class JobService implements ClientboundBossEventPacket.Handler {
     String s = JobXp.normalize(title);
     return JobXp.NAMES.keySet().stream().filter(s::contains).count() >= 4;
   }
+  public void publicStats(JobXp.Reading reading, long at) {
+    var existing = tracker.data.jobs.get(reading.job());
+    if (existing != null && (existing.active != null || existing.updated >= at)) return;
+    personalStats(reading);
+    tracker.data.jobs.get(reading.job()).updated = at;
+    tracker.resetBaseline(reading.job());
+  }
+
   public void personalStats(JobXp.Reading reading) {
     var j = tracker.data.jobs.computeIfAbsent(reading.job(), id -> { var n = new JobTracker.Job(); n.id = id; return n; });
     j.level = reading.level(); j.xp = reading.xp(); j.required = reading.required(); j.updated = System.currentTimeMillis();

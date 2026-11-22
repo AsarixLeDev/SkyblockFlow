@@ -40,7 +40,7 @@ public abstract class ChatScreenCopyMixin {
   private void skyblockflow$copy(
       MouseButtonEvent event, boolean twice, CallbackInfoReturnable<Boolean> ci) {
     if (event.button() == 0 && event.y() >= 5 && event.y() < 19
-        && event.x() >= 6 && event.x() < 154 && (event.x() - 6) % 50 < 48) {
+        && event.x() >= 6 && event.x() < 6 + ChatTabAccess.Tab.values().length * 50 && (event.x() - 6) % 50 < 48) {
       skyblockflow$selected = ChatTabAccess.Tab.values()[(int) (event.x() - 6) / 50];
       ((ChatTabAccess) Minecraft.getInstance().gui.hud.getChat()).skyblockflow$tab(skyblockflow$selected);
       ci.setReturnValue(true);

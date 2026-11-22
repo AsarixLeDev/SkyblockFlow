@@ -13,14 +13,8 @@ public final class ItemNameMatcher {
 
   private static String normalize(String text) {
     String value = text.toLowerCase(Locale.ROOT).replaceAll("§[0-9a-fk-orx]", "");
-    String small = "ᴀʙᴄᴅᴇꜰɢʜɪᴊᴋʟᴍɴᴏᴘǫʀꜱᴛᴜᴠᴡʏᴢ";
-    String normal = "abcdefghijklmnopqrstuvwyz";
-    StringBuilder result = new StringBuilder();
-    for (char c : value.toCharArray()) {
-      int i = small.indexOf(c);
-      result.append(i >= 0 ? normal.charAt(i) : Character.isSpaceChar(c) ? ' ' : c);
-    }
     // Map decorative 'ǫ' to q before Unicode decomposition turns it into an o.
+    String result = ServerText.regularLetters(value);
     return Normalizer.normalize(result, Normalizer.Form.NFKD)
         .replaceAll("\\p{M}+", "")
         .replaceAll("\\s+", " ")

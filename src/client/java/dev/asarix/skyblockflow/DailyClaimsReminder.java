@@ -11,13 +11,17 @@ import net.minecraft.network.chat.Component;
 public final class DailyClaimsReminder {
   private final SkyblockFlowClient app;
   private final Path file;
-  private final DailyClaims reminder;
+  private DailyClaims reminder;
   private long nextCheck;
   private static final SystemToast.SystemToastId TOAST = new SystemToast.SystemToastId(15_000);
 
   public DailyClaimsReminder(SkyblockFlowClient app) {
     this.app = app;
     file = app.store.directory().resolve("daily-claims-date.txt");
+    reload();
+  }
+
+  void reload() {
     String saved = "";
     try { if (Files.exists(file)) saved = Files.readString(file).strip(); }
     catch (java.io.IOException e) { app.error("Could not read daily reminder: " + e.getMessage()); }

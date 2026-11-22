@@ -24,8 +24,8 @@ import net.minecraft.world.phys.BlockHitResult;
 /** Waypoint runtime. World sampling and incremental routing only run on the client thread. */
 public final class Waypoints implements AutoCloseable {
   public final SkyblockFlowClient app;
-  public final WaypointStore store;
-  public final WaypointMapCache cache;
+  public WaypointStore store;
+  public WaypointMapCache cache;
   public final WaypointVisits visits = new WaypointVisits();
   public final WaypointRenderer renderer;
   public String status = "Create a set to begin", editingCategory = "";
@@ -39,6 +39,7 @@ public final class Waypoints implements AutoCloseable {
   private WaypointPathfinder search;
   private boolean flight, placementLatch, openRequested;
   private int ticks;
+  private boolean pausedForConfigReload;
   private long lastRouteNanos;
   // Each loaded chunk retains its column cursor, even when the player moves.
   private final LinkedHashMap<Long, Integer> sampleChunks = new LinkedHashMap<>();
@@ -86,6 +87,23 @@ public final class Waypoints implements AutoCloseable {
                           openRequested = true;
                           return 1;
                         })));
+  }
+
+  void pauseForConfigReload() {
+    store.close();
+    cache.close();
+    renderer.close();
+    pausedForConfigReload = true;
+  }
+
+  void reloadPreferences() {
+    if (pausedForConfigReload) {
+      store = new WaypointStore(app.store.directory(), this::error);
+      cache = new WaypointMapCache(app.store.directory().resolve("waypoint-maps"), this::error);
+      pausedForConfigReload = false;
+    }
+    store.load();
+    lastBuild = -1;
   }
 
   public WaypointData data() {

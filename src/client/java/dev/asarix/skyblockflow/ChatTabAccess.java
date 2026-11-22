@@ -2,7 +2,7 @@ package dev.asarix.skyblockflow;
 
 public interface ChatTabAccess {
   enum Tab {
-    ALL("All"), CHAT("Chat"), NOTICES("Notices");
+    ALL("All"), CHAT("Chat"), NOTICES("Notices"), MP("mp");
 
     public final String label;
 

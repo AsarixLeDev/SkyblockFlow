@@ -35,6 +35,8 @@ public final class ToolsScreen extends FormScreen {
             () -> draft.shopValues = !draft.shopValues);
         label("Excalia bonus: +1.5% every 10 levels in the item's job.", 0, 40);
         label("Earn job XP first so the mod knows your current level.", 0, 62);
+        action("Public prices & rankings", 0, 100, bodyW,
+            () -> minecraft.gui.setScreen(new PublicDataScreen(app, this)));
       }
       case "Clock" -> {
         toggle("Show game time", draft.clock, 0, () -> draft.clock = !draft.clock);

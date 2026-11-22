@@ -25,6 +25,8 @@ public final class IslandMeasurements {
   private boolean needOwner, askedOwner, browseMessage, foundDuringBrowse;
   private long ownerUntil;
   public void leaderChanged() {
+    service.forgetPublicIsland();
+    service.history.apiIslandId = "";
     service.history.owner = ""; evidenceOwner = ""; ownPower = -1;
     askedOwner = foundDuringBrowse = false; needOwner = true; service.saveHistory();
     status = "Run /is info to identify your island leader";
@@ -154,6 +156,27 @@ public final class IslandMeasurements {
         now - h.snapshotAt > FRESH
             ? "Unknown · stale snapshot"
             : IslandBoard.estimate(h.islands.values(), evidenceOwner, ownPower);
+  }
+
+  public void publicRank(ExcaliaApiData.Island island, List<ExcaliaApiData.Island> board, long at) {
+    String owner = island.owner().toLowerCase(Locale.ROOT);
+    var old = service.history.boards.get("island/" + owner);
+    if (old != null && old.at() >= at) return;
+    service.history.owner = evidenceOwner = owner;
+    needOwner = false; askedOwner = foundDuringBrowse = true;
+    boolean isolated = board.stream().filter(i -> Math.abs(i.rank() - island.rank()) == 1)
+        .noneMatch(i -> i.power() == island.power());
+    service.confirm("island/" + owner, "Island power", island.rank(), at, isolated);
+    estimate = "Confirmed #" + island.rank(); status = "Public island ranking updated";
+    if (at >= powerAt) { ownPower = island.power(); powerAt = at; }
+    service.saveHistory();
+  }
+
+  public void publicPower(long power, long at) {
+    if (at < powerAt) return;
+    ownPower = power; powerAt = at;
+    updateEstimate(System.currentTimeMillis());
+    status = "Island power · " + Numbers.integer(power);
   }
 
   public boolean needsOwner() { return needOwner; }

@@ -62,6 +62,8 @@ public final class SkyblockFlowClient implements ClientModInitializer {
           "^(?:\\[[^\\]]+\\]\\s*)*(?:<([A-Za-z0-9_]{1,16})>|([A-Za-z0-9_]{1,16}):)\\s*(.*)$");
 
   public RecipeHelper recipes;
+  public ExcaliaApiService excaliaApi;
+  private LegacyConfigPrompt configMigration;
 
   @Override
   public void onInitializeClient() {
@@ -85,6 +87,7 @@ public final class SkyblockFlowClient implements ClientModInitializer {
     waypoints = new Waypoints(this);
     spawners = new SpawnerRanges(this);
     recipes = new RecipeHelper(this);
+    excaliaApi = new ExcaliaApiService(this);
     tools = new GameplayTools(this);
     net.fabricmc.fabric.api.client.command.v2.ClientCommandRegistrationCallback.EVENT.register(
         (dispatcher, registry) ->
@@ -216,6 +219,8 @@ public final class SkyblockFlowClient implements ClientModInitializer {
           if (m.matches()) receive(m.group(3), full, m.group(1) != null ? m.group(1) : m.group(2));
           else receive(full, full, null);
         });
+    configMigration = new LegacyConfigPrompt(this);
+    configMigration.register();
     ClientTickEvents.START_CLIENT_TICK.register(this::tick);
     ClientPlayConnectionEvents.DISCONNECT.register(
         (handler, client) -> {
@@ -280,6 +285,29 @@ public final class SkyblockFlowClient implements ClientModInitializer {
     }
   }
 
+  public void openConfigMigration(net.minecraft.client.gui.screens.Screen parent) {
+    configMigration.openFromSettings(Minecraft.getInstance(), parent);
+  }
+
+  void pauseConfigMigration() {
+    playerNames.pauseForConfigReload();
+    jobs.flush();
+    pets.flush();
+    closest.pauseForConfigReload();
+    waypoints.pauseForConfigReload();
+  }
+
+  void reloadMigratedSettings(Config imported) {
+    store.config = imported;
+    store.loadWarning = "";
+    reloadPatterns();
+    waypoints.reloadPreferences();
+    tools.reloadPreferences();
+    shared.reloadPreferences();
+    playerNames.reloadPreferences();
+    voice.load(store.directory());
+  }
+
   public void reloadPatterns() {
     patterns.clear();
     lastAlert.clear();
@@ -297,6 +325,7 @@ public final class SkyblockFlowClient implements ClientModInitializer {
       rocket.denial(body);
       pets.message(body);
       celebrations.message(body);
+      jobs.fishingMessage(body);
     }
     if (!alertsAllowed() || !store.config.enabled(Feature.CHAT)) return;
     for (AlertRule rule : store.config.alerts) {
@@ -381,7 +410,8 @@ public final class SkyblockFlowClient implements ClientModInitializer {
         hud.setOverlayMessage(
             dev.asarix.skyblockflow.ui.DisplayText.literal(style.render(style.actionBar, title, subtitle)), false);
     }
-    sounds.playAlert(style != null && style.customSound ? style : original, kind);
+    var playback = kind != AlarmKind.CHAT && style != null && style.customSound ? style : original;
+    sounds.playAlert(playback, kind);
     return true;
   }
 
@@ -438,7 +468,9 @@ public final class SkyblockFlowClient implements ClientModInitializer {
   }
 
   public void openEditor() {
-    Minecraft.getInstance().gui.setScreen(new FeatureBrowserScreen(this));
+    var mc = Minecraft.getInstance();
+    var parent = mc.gui.screen() instanceof net.minecraft.client.gui.screens.TitleScreen title ? title : null;
+    mc.gui.setScreen(new FeatureBrowserScreen(this, parent));
   }
 
   public boolean isControlKey(int key) {

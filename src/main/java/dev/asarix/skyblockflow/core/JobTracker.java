@@ -91,6 +91,8 @@ public final class JobTracker {
     this.data = data;
   }
 
+  public void resetBaseline(String job) { observed.remove(job); }
+
   public void newConnection() {
     observed.clear();
   }

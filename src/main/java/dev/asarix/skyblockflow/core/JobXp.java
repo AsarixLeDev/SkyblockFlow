@@ -19,15 +19,16 @@ public final class JobXp {
   }
 
   private static final String NUMBER = "([0-9][0-9 .,']*)";
-  private static final Pattern BAR =
-      Pattern.compile(
-          "(?<![a-z])(mineur|bucheron|fermier|chasseur|artisan|aventurier|pecheur)\\b[^0-9]*niveau\\s*([0-9]{1,3})[^0-9]*"
-              + NUMBER
-              + "\\s*/\\s*"
-              + NUMBER
-              + "\\s*xp(?:\\s*\\(\\s*\\+\\s*"
-              + NUMBER
-              + "\\s*\\))?");
+  private static final String XP_TOTAL =
+      "(?:niveau|niv\\.)\\s*(\\d{1,3})(?!\\d)[^0-9]*"
+          + NUMBER + "\\s*/\\s*" + NUMBER + "\\s*xp(?:\\s*\\(\\s*\\+\\s*" + NUMBER + "\\s*\\))?";
+  private static final Pattern BAR = Pattern.compile(
+      "(?<![a-z])(mineur|bucheron|fermier|chasseur|artisan|aventurier|pecheur|peche)\\b[^0-9]*"
+          + XP_TOTAL);
+  private static final Pattern ICON_BAR = Pattern.compile("([\uf730-\uf736])[^a-z0-9]*" + XP_TOTAL);
+  private static final Pattern FISHING_PREFIX = Pattern.compile("^\\s*\\[peche]\\s*");
+  private static final Pattern FISHING_TOTAL = Pattern.compile(XP_TOTAL);
+  private static final Pattern XP_GAIN = Pattern.compile("\\+\\s*" + NUMBER + "\\s*xp");
 
   public record Reading(String job, int level, double xp, double required, double gain) {}
 
@@ -58,26 +59,60 @@ public final class JobXp {
   }
 
   public static String normalize(String text) {
-    String small = "ᴀʙᴄᴅᴇꜰɢʜɪᴊᴋʟᴍɴᴏᴘǫʀꜱᴛᴜᴠᴡʏᴢ";
-    String normal = "abcdefghijklmnopqrstuvwyz";
-    StringBuilder result = new StringBuilder();
-    // Map small caps first: NFKD would decompose the server's small-cap Q (ǫ) to O.
-    for (char c : decodeGlyphs(text).replaceAll("§[0-9a-fk-orxA-FK-ORX]", "").toCharArray()) {
-      int i = small.indexOf(c);
-      result.append(i >= 0 ? normal.charAt(i) : Character.isSpaceChar(c) ? ' ' : c);
-    }
+    // Decode before NFKD, which would decompose the server's small-cap Q (ǫ) to O.
+    String result = ServerText.regularLetters(decodeGlyphs(text).replaceAll("§[0-9a-fk-orxA-FK-ORX]", ""));
     return Normalizer.normalize(result, Normalizer.Form.NFKD)
         .replaceAll("\\p{M}+", "").toLowerCase(Locale.ROOT);
   }
 
   public static Reading parse(String text) {
     if (text == null || text.length() > 4096) return null;
-    Matcher m = BAR.matcher(normalize(text));
+    String plain = normalize(text).replaceAll("\\p{Cf}", "");
+    Matcher m = BAR.matcher(plain);
+    if (m.find()) {
+      String label = m.group(1);
+      return reading(label.equals("peche") ? "pecheur" : label, m, 2, 0);
+    }
+    m = ICON_BAR.matcher(plain);
     if (!m.find()) return null;
+    // Excalia's Oraxen atlas also has standalone icons without the whole-word label.
+    String job = switch (m.group(1).charAt(0)) {
+      case 0xf730 -> "mineur";
+      case 0xf731 -> "bucheron";
+      case 0xf732 -> "fermier";
+      case 0xf733 -> "chasseur";
+      case 0xf734 -> "artisan";
+      case 0xf735 -> "aventurier";
+      case 0xf736 -> "pecheur";
+      default -> throw new IllegalArgumentException("Invalid job icon");
+    };
+    return reading(job, m, 2, 0);
+  }
+
+  public static Reading fishingMessage(String text) {
+    if (text == null || text.length() > 4096 || !text.startsWith("[")) return null;
+    String plain = normalize(text).replaceAll("\\p{Cf}", "");
+    Matcher prefix = FISHING_PREFIX.matcher(plain);
+    if (!prefix.find()) return null;
+    Matcher total = FISHING_TOTAL.matcher(plain).region(prefix.end(), plain.length());
+    if (!total.find()) return null;
+    Matcher gain = XP_GAIN.matcher(plain).region(prefix.end(), plain.length());
+    double statedGain = 0;
+    if (gain.find()) {
+      try {
+        statedGain = number(gain.group(1));
+      } catch (NumberFormatException e) {
+        return null;
+      }
+    }
+    return reading("pecheur", total, 1, statedGain);
+  }
+
+  private static Reading reading(String job, Matcher m, int start, double statedGain) {
     try {
-      int level = Integer.parseInt(m.group(2));
-      double xp = number(m.group(3)), required = number(m.group(4));
-      double gain = m.group(5) == null ? 0 : number(m.group(5));
+      int level = Integer.parseInt(m.group(start));
+      double xp = number(m.group(start + 1)), required = number(m.group(start + 2));
+      double gain = m.group(start + 3) == null ? statedGain : number(m.group(start + 3));
       if (level > 200
           || required < 0
           || (required == 0 && level != 200)
@@ -86,7 +121,7 @@ public final class JobXp {
           || !Double.isFinite(xp + required + gain)
           || required > 1e12
           || gain > 1e12) return null;
-      return new Reading(m.group(1), level, xp, required, gain);
+      return new Reading(job, level, xp, required, gain);
     } catch (NumberFormatException e) {
       return null;
     }

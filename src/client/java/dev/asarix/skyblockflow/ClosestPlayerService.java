@@ -108,6 +108,7 @@ public final class ClosestPlayerService {
   public RankHistory.Player neighbor(String job) { return history.neighbor(job, Minecraft.getInstance().getUser().getName()); }
   /** Called only by the player's stats command or Refresh button. */
   public void requestPersonalStats() {
+    if (app.excaliaApi != null && app.excaliaApi.personalStats()) return;
     var mc = Minecraft.getInstance();
     if (mc.player == null || busy()) return;
     quietPersonal = true;
@@ -157,11 +158,18 @@ public final class ClosestPlayerService {
   }
 
   public boolean busy() {
-    return phase != Phase.IDLE || !pending.isEmpty();
+    return commandMeasurementActive() || app.excaliaApi != null && app.excaliaApi.pending();
   }
+
+  void forgetPublicIsland() { if (app.excaliaApi != null) app.excaliaApi.forgetIsland(); }
+
+  public boolean commandMeasurementActive() { return phase != Phase.IDLE || !pending.isEmpty(); }
+
+  private boolean apiFallback;
 
 
   public void reset() {
+    if (app.excaliaApi != null) app.excaliaApi.cancel();
     flushHistory();
     statsReplies.reset();
     phase = Phase.IDLE;
@@ -204,7 +212,7 @@ public final class ClosestPlayerService {
     }
   }
 
-  private final RankHistoryWriter historyWriter = new RankHistoryWriter();
+  private RankHistoryWriter historyWriter = new RankHistoryWriter();
   private long historySaveDue;
 
   void saveHistory() {
@@ -216,6 +224,11 @@ public final class ClosestPlayerService {
     historySaveDue = 0;
     historyWriter.save(historyFile, history.snapshot(), message ->
         Minecraft.getInstance().schedule(() -> app.error(message)));
+  }
+
+  void pauseForConfigReload() {
+    closeHistory();
+    historyWriter = new RankHistoryWriter();
   }
 
   public void closeHistory() {
@@ -291,6 +304,10 @@ public final class ClosestPlayerService {
       status = "Join a world and enable Leaderboards";
       return;
     }
+    if (!apiFallback && app.excaliaApi != null && app.excaliaApi.measure(jobs, missing -> {
+      apiFallback = true;
+      try { start(missing); } finally { apiFallback = false; }
+    })) return;
     total = jobs.size();
     completed = 0;
     pending.addAll(jobs);
@@ -348,6 +365,7 @@ public final class ClosestPlayerService {
       status = reason;
       outcomes.put(job, reason);
     }
+    if (app.excaliaApi != null) app.excaliaApi.cancel();
     pending.clear();
     phase = Phase.IDLE;
     hiddenBoard = "";

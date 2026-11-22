@@ -39,6 +39,8 @@ public final class LeaderboardsScreen extends FormScreen {
     action("Measure current", half + 6, 0, half, service::measureCurrent);
     String next = service.nextCommand();
     if (!next.isEmpty()) action("Run /" + next, 0, 30, bodyW, () -> service.executeNext(next));
+    action("Public data settings", 0, 64, half,
+        () -> minecraft.gui.setScreen(new PublicDataScreen(app, this)));
     action("Cancel measurement", half + 6, 64, half, service::cancel);
     label(service.status, 0, 98);
     label(service.progress(), 0, 118);
@@ -68,7 +70,7 @@ public final class LeaderboardsScreen extends FormScreen {
     page("Island power");
     var island = service.islands;
     label(
-        "Open /is visits and use its page arrows to browse islands.", 0, 0);
+        "Public rankings when available; browse /is visits for other islands.", 0, 0);
     label(island.status, 0, 26);
     var h = service.history;
     var last = h.boards.get("island/" + h.owner);
@@ -96,7 +98,7 @@ public final class LeaderboardsScreen extends FormScreen {
         0,
         76);
     label("Position · " + island.estimate, 0, 100);
-    action("I changed of leader", 0, 168, bodyW, island::leaderChanged);
+    action(h.owner.isEmpty() ? "Identify my island" : "I changed of leader", 0, 168, bodyW, island::leaderChanged);
     action("Browse-page hint: " + (service.settings().islandBrowseHint ? "ON" : "OFF"), 0, 202, bodyW, () -> {
       service.settings().islandBrowseHint = !service.settings().islandBrowseHint; app.save(); rebuildWidgets();
     });

@@ -14,7 +14,7 @@ Install Fabric Loader **0.20.1** and Fabric API **0.161.0+26.2** in a Minecraft 
 
 Choose a feature to configure it. Search includes settings inside nested menus. Settings and overlay layouts save when closed; invalid values stay open for correction. Imports, deletion and account authorization require an explicit action.
 
-Download [PUBLIC-BETA-0.0.1](https://github.com/AsarixLeDev/SkyblockFlow/releases/tag/PUBLIC-BETA-0.0.1). The Discord overlay cannot connect in this release while public access is being verified. See [Discord availability](DISCORD-RELEASE.md).
+Download [PUBLIC-BETA-0.0.2](https://github.com/AsarixLeDev/SkyblockFlow/releases/tag/PUBLIC-BETA-0.0.2). The Discord overlay cannot connect in this release while public access is being verified. See [Discord availability](DISCORD-RELEASE.md).
 
 ## Features
 
@@ -27,8 +27,8 @@ Download [PUBLIC-BETA-0.0.1](https://github.com/AsarixLeDev/SkyblockFlow/release
 | **Spawner helper** | Highlights activation distance and checks the surrounding 5×5×5 spawning area. Orange warnings mark obstructions and hostile-spawner lighting; other spawners can be exempted. Uses loaded client data. |
 | **Waypoints and maps** | Organizes colored checkpoints into sets and categories, with labels, visibility zones, a minimap, recorded surface maps, copy/offset tools and walking/flying route guidance. [Waypoints guide](WAYPOINTS.md). |
 | **Inventory calculator** | A compact arithmetic bar in inventories and containers, with parentheses, decimal calculations, a scrolling expression and a result that fits the bar. |
-| **Recipe helper** | Browse and search items beside your inventory. Check recipes and uses, pin favorites, and track the ingredients you need against your inventory and an optional open container. |
-| **Shop values** | Replaces recognized shop-price lore with job-adjusted unit and stack prices. Preserves unrelated lore and identifies unavailable level information. |
+| **Recipe helper** | Browse and search items beside your inventory. Check recipes and uses, pin favorites, and scroll the materials checklist inside your inventory. Missing ingredients come first; materials you already have appear last in every checklist. |
+| **Shop values** | Shows current server-shop prices with job-adjusted unit and stack values, plus the cheapest player-shop seller and highest buyer with merchant names. Sold-out offers are excluded and totals respect listed stock. |
 | **Mineral counter** | Counts selected ore blocks mined this session, with item icons. |
 | **Artisan calculator** | Estimates how many craftable tools are needed for the next level or next multiple of 20, across a configurable number of tool tiers. |
 | **Energy planner** | Saves solar panels, matching batteries, nuclear generators, fuels, all 12 effect emitters and machine demand. Emitter consumption follows the chosen effect level. Predicts supply and battery depletion times. Select machines in the world to fill a plan; ordinary blocks and cables are ignored, while unknown machines appear pale red and can be assigned a type or removed. Right-click a saved machine to read its real menu and update its type, installed battery and chosen emitter level, even outside selection mode. Open each panel once to remember its battery; inserting or removing it updates the plan while its menu is open. The menu offers a planner shortcut; block/menu observations stay available under Detected data. Highlights can be hidden. Locations and custom consumption values are saved. |
@@ -58,9 +58,15 @@ Verified styles are cached locally and your own appearance is available at launc
 
 ![Community names settings](docs/screenshots/community-names.png)
 
-## Manual leaderboard checks
+## Public rankings and shop prices
 
-Choose a job or **Measure all**, then click the displayed **Run /…** button. After the server responds, the next command becomes available. There is a minimum gap between commands. For islands, open `/is visits` and browse its actual page buttons; the owner is remembered until you choose **I changed of leader**.
+Excalia Season 3's public API supplies published job rankings (including fishing), island power rankings and current shop prices. Bossbars remain the source for live XP sessions. The API currently lists the top 15 players per job, the top 20 fishing players and the top 25 islands by power. For other players, **Measure** offers the usual **Run /…** commands; each command waits for your click. Island membership can be verified from a known island's public details. If your island is not identified, choose **Identify my island** and run the displayed `/is info` command, or browse `/is visits`.
+
+**Features → Leaderboards → Public data settings** (also available in **Shop values**) controls rankings, market quotes and server-shop prices separately. Recent snapshots are cached locally; refreshes respect endpoint cache times and rate limits. Temporary failures keep recent prices marked as cached. After ten minutes, player-shop quotes disappear and server prices fall back to the bundled reference.
+
+**Market buy** is the lowest available selling price; **Market sell** is the highest available buyback price. Quotes show the merchant, unit price and available stack total. The API does not provide shop coordinates or island IDs, and prices or stock may change before you arrive. Ambiguous item variants are omitted.
+
+The **mp** chat tab contains incoming private messages and replies, using your **mp / Message privé** alert pattern independently of whether its alarm is enabled. Public messages and notices stay available in the other tabs.
 
 ![Manual leaderboard command](docs/screenshots/leaderboards.png)
 

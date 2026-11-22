@@ -38,6 +38,12 @@ The overlay reads profile and voice-call information after approval. Microphone/
 
 Disconnect revokes authorization. Failed revocations are kept only to retry removal; a crash cannot guarantee immediate revocation. You can always remove access in Discord Settings → Authorized Apps. Revoking the grant also disconnects other installations authorized through this application. See [Discord release requirements](DISCORD-RELEASE.md) for public-access and platform verification status.
 
+## Excalia public data
+
+While connected to Excalia, enabled leaderboard and shop-value features request public Season 3 rankings and prices from `https://excalia.fr`. Their public-data settings start enabled and can be turned off individually in **Leaderboards → Public data settings** or **Shop values**. No game access token, Discord token, chat, inventory, server location or private account data is sent. Identifying an island may request its public island UUID. Excalia receives the normal connection IP address and a mod-identifying user agent; its own privacy policy applies.
+
+Rankings and price responses are cached locally under `config/skyblockflow/public-data/s3/`. They contain public player/merchant names, UUIDs, ranks and prices. Recent cache entries are reused after launch; quotes older than ten minutes are not displayed. Leaderboard history may retain observed public rankings until you delete that local history. Requests use HTTPS, bounded response sizes and timeouts, and honor rate-limit backoff. Disabling a setting stops new requests for that data; a request already in flight may finish.
+
 ## Other connections
 
 | Optional feature | Destination and purpose |

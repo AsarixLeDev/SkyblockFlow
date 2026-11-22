@@ -216,6 +216,12 @@ public final class SharedEdits implements AutoCloseable {
     this.app = app;
     audioCache = new SharedAudioCache(app.store.sounds());
     remoteScenes = new RemoteScenes(app);
+    reloadPreferences();
+    register();
+  }
+
+  void reloadPreferences() {
+    settings = new Settings();
     try {
       var f = app.store.directory().resolve("sharing.json");
       if (Files.exists(f)) {
@@ -241,7 +247,6 @@ public final class SharedEdits implements AutoCloseable {
     }
     clearTemporaryMedia(app.store.directory().resolve("celebrations/.shared"));
     clearTemporaryMedia(app.store.directory().resolve("sharing-temp"));
-    register();
   }
 
   private Path temporaryArchive(String prefix) throws java.io.IOException {

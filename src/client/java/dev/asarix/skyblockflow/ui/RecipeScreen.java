@@ -430,9 +430,7 @@ public final class RecipeScreen extends Screen {
       return true;
     }
     if (materials) {
-      int shown = Math.max(1, (h - 120) / 19);
-      checklistScroll = Math.clamp(checklistScroll + delta, 0,
-          Math.max(0, helper.checklist().materials().size() - shown));
+      checklistScroll = helper.checklist().offset(h - 86, checklistScroll + delta);
       return true;
     }
     pageRecipe(delta);

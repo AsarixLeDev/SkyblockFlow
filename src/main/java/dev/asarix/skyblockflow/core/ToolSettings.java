@@ -23,6 +23,7 @@ public final class ToolSettings {
               "ancient_debris"));
   public Map<String, HudSettings.Placement> layouts = new LinkedHashMap<>();
   public RecipeSettings recipes = new RecipeSettings();
+  public ExcaliaApiSettings publicData = new ExcaliaApiSettings();
   public EnergyPlan energy = new EnergyPlan();
 
   public HudSettings.Placement layout(String key) {
@@ -54,6 +55,7 @@ public final class ToolSettings {
     }
     if (recipes == null) recipes = new RecipeSettings();
     recipes.normalize();
+    if (publicData == null) publicData = new ExcaliaApiSettings();
     if (energy == null) energy = new EnergyPlan();
     energy.normalize();
   }

@@ -59,6 +59,7 @@ public final class SettingSearchScreen extends FlowScreen {
             p -> new OverlayColorsScreen(app, p, app.store.config.hud.base.colors)));
     routes.add(new Route("Discord / authentication", p -> new DiscordConnectionScreen(app, p)));
     routes.add(new Route("Discord / guide / privacy / tutorial", p -> new DiscordGuideScreen(app, p)));
+    routes.add(new Route("Excalia / public API / rankings / player shops / market prices", p -> new PublicDataScreen(app, p)));
     routes.add(new Route("Energy planner", p -> new EnergyScreen(app, p)));
     for (var panel : HudSettings.Panel.values())
       routes.add(new Route("Overlays / " + panel.title, p -> new HudOptions(app, p, panel)));

@@ -9,7 +9,7 @@ import java.util.concurrent.CompletableFuture;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.input.MouseButtonEvent;
-import net.minecraft.core.registries.BuiltInRegistries;
+import net.minecraft.client.sounds.SoundManager;
 import net.minecraft.util.Util;
 
 public final class SoundPickerScreen extends FlowScreen {
@@ -18,6 +18,7 @@ public final class SoundPickerScreen extends FlowScreen {
   private String selected = "", query = "";
   private List<String> all = List.of(), filtered = List.of();
   private int scroll;
+  private boolean picked;
 
   public SoundPickerScreen(SkyblockFlowClient app, Screen parent, SoundSettings draft) {
     super(app, parent, "Sounds");
@@ -86,18 +87,22 @@ public final class SoundPickerScreen extends FlowScreen {
           onClose();
         },
         true);
-    button(
-        20 + w,
-        height - 60,
-        w,
-        "Preview",
-        () -> {
-          if (!all.contains(selected)) return;
-          SoundSettings sample = ConfigStore.copy(draft, SoundSettings.class);
-          sample.soundKind = kind;
-          sample.sound = selected;
-          app.sounds.play(sample);
-        });
+    // Play just the selected sound, without Minecraft's generic button click over it.
+    var preview = new FlowButton(20 + w, height - 60, w, 22, "Preview", () -> {
+      if (!all.contains(selected)) {
+        notice = "Select a sound first";
+        return;
+      }
+      SoundSettings sample = ConfigStore.copy(draft, SoundSettings.class);
+      sample.soundKind = kind;
+      sample.sound = selected;
+      app.sounds.play(sample);
+    }, false) {
+      @Override
+      public void playDownSound(SoundManager manager) {}
+    };
+    addWidget(preview);
+    chrome.add(preview);
     button(
         26 + 2 * w,
         height - 60,
@@ -108,9 +113,7 @@ public final class SoundPickerScreen extends FlowScreen {
   }
 
   private void refresh() {
-    if (kind == SoundKind.MP3) all = app.sounds.files();
-    else
-      all = BuiltInRegistries.SOUND_EVENT.keySet().stream().map(Object::toString).sorted().toList();
+    all = kind == SoundKind.MP3 ? app.sounds.files() : app.sounds.vanillaSounds();
     filter();
   }
 
@@ -135,6 +138,7 @@ public final class SoundPickerScreen extends FlowScreen {
       int i = (int) (e.y() - 108 + scroll) / 24;
       if (i < filtered.size()) {
         selected = filtered.get(i);
+        picked = true;
         return true;
       }
     }
@@ -182,7 +186,8 @@ public final class SoundPickerScreen extends FlowScreen {
       text(g, cut(s, width - 48), 23, y + 7, s.equals(selected) ? ACCENT : TEXT);
     }
     if (filtered.isEmpty())
-      text(g, "No sounds found. Drop an MP3 here to import it.", 20, 119, MUTED);
+      text(g, kind == SoundKind.MP3 ? "Drop an MP3 here to import it." : "No matching sounds.",
+          20, 119, MUTED);
     g.disableScissor();
     renderChrome(g, mx, my, dt);
   }
@@ -191,7 +196,7 @@ public final class SoundPickerScreen extends FlowScreen {
   public void onClose() {
     app.sounds.stopPreview();
     if (kind == SoundKind.SILENT) draft.soundKind = kind;
-    else if (!selected.isEmpty() && all.contains(selected)) {
+    else if (picked && all.contains(selected)) {
       draft.soundKind = kind;
       draft.sound = selected;
     }

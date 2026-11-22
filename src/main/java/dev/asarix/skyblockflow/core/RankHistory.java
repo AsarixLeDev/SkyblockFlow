@@ -63,6 +63,7 @@ public final class RankHistory {
     copy.islandScores.putAll(islandScores);
     copy.snapshotAt = snapshotAt;
     copy.owner = owner;
+    copy.apiIslandId = apiIslandId;
     return copy;
   }
   public Player neighbor(String job, String self) {
@@ -75,6 +76,7 @@ public final class RankHistory {
   }
   public long snapshotAt;
   public String owner = "";
+  public String apiIslandId = "";
 
   public int baseline(String board) {
     return baselines.getOrDefault(board, 0);
@@ -116,6 +118,7 @@ public final class RankHistory {
                           || e.getValue().leader() == null
                           || e.getValue().precision() < 1)) throw new IllegalArgumentException();
       if (h.players == null) h.players = new LinkedHashMap<>();
+      if (h.apiIslandId == null) h.apiIslandId = "";
       h.players.entrySet().removeIf(e -> !JobXp.NAMES.containsKey(e.getKey()) || e.getValue() == null);
       for (var board : h.players.values()) board.values().removeIf(p -> p == null || p.name == null || p.rank < 0 || p.level < 0 || p.level > 200);
       if (h.islandScores == null) h.islandScores = new LinkedHashMap<>();

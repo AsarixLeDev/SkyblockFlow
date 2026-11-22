@@ -4,11 +4,14 @@ import dev.asarix.skyblockflow.core.Models.*;
 import java.util.*;
 
 public final class DefaultChatAlerts {
+  static final String SKILL_READY_ID = "skill-ready";
+  static final String SKILL_READY_PATTERN = "[skill] est à nouveau disponible.";
+
   private DefaultChatAlerts() {}
 
   public static List<AlertRule> create() {
     return new ArrayList<>(List.of(
-        rule("skill-ready", "Skill ready", "[skill] est à nouveau disponible.",
+        rule(SKILL_READY_ID, "Skill ready", SKILL_READY_PATTERN,
             "Skill [skill] can be used again", ""),
         rule("private-message", "Message privé", "[[player] -> me] [msg]",
             "Message de [player]", "Vous avez reçu un message privé."),

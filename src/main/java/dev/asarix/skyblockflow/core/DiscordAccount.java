@@ -54,6 +54,11 @@ public final class DiscordAccount implements AutoCloseable {
   }
 
   public synchronized void load(Path directory) {
+    active = pendingRevoke = null;
+    remember = false;
+    retryAt = 0;
+    revision++;
+    view = new View(Phase.OFF, "not identified", INTRO);
     file = directory.resolve("discord-oauth-private.json");
     if (!Files.exists(file, LinkOption.NOFOLLOW_LINKS)) return;
     try {
@@ -73,7 +78,6 @@ public final class DiscordAccount implements AutoCloseable {
         view = pendingView();
       } else if (remember && data.has("tokens")) {
         active = decode(data.getAsJsonObject("tokens"));
-        revision++;
         view = linkedView();
       }
     } catch (Exception ignored) {

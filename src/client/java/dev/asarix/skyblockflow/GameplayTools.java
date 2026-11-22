@@ -19,34 +19,49 @@ public final class GameplayTools {
   public final SkyblockFlowClient app;
   public final Map<String, Long> mined = new LinkedHashMap<>();
   public final EnergySelector energy;
+  private final DailyClaimsReminder dailyClaims;
   public final RocketLeagueFeed esports = new RocketLeagueFeed();
+  private static final List<String> MINERALS = List.of(
+      "coal", "iron", "copper", "gold", "redstone", "lapis", "diamond", "emerald", "quartz");
   private static final LiquipediaMatches.Match ESPORTS_PREVIEW = new LiquipediaMatches.Match(
       "Blue team", "Orange team", "BO5: 2 – 1", "Game: 1 – 0", "", "", "Rocket League · Preview");
   private final TeamLogos logos = new TeamLogos();
   private long lastDebris;
 
-  private record Pending(BlockState state, Object level, long expires) {}
+  private record Pending(BlockState state, net.minecraft.client.multiplayer.ClientLevel level, long expires) {}
 
   private final Map<net.minecraft.core.BlockPos, Pending> pending = new HashMap<>();
 
+  public void miningStarted(net.minecraft.core.BlockPos pos, BlockState state) {
+    // A server-side skill can break the block before the client ever predicts its removal.
+    rememberMining(pos, state, 1_500_000_000L);
+  }
+
   public void attempted(net.minecraft.core.BlockPos pos, BlockState state) {
-    pending.put(
-        pos.immutable(),
-        new Pending(state, Minecraft.getInstance().level, System.nanoTime() + 5_000_000_000L));
+    rememberMining(pos, state, 5_000_000_000L);
+  }
+
+  private void rememberMining(net.minecraft.core.BlockPos pos, BlockState state, long duration) {
+    if (mineral(state) != null)
+      pending.put(pos.immutable(),
+          new Pending(state, Minecraft.getInstance().level, System.nanoTime() + duration));
   }
 
   public void confirmed(net.minecraft.core.BlockPos pos, BlockState state) {
-    var old = pending.remove(pos);
-    if (old != null
-        && old.level() == Minecraft.getInstance().level
-        && old.expires() > System.nanoTime()
-        && !old.state().equals(state)) mined(old.state());
+    var old = pending.get(pos);
+    if (old == null) return;
+    if (old.level() != Minecraft.getInstance().level || old.expires() <= System.nanoTime()) {
+      pending.remove(pos);
+    } else if (old.state().getBlock() != state.getBlock()) {
+      pending.remove(pos);
+      mined(old.state());
+    }
   }
 
   public GameplayTools(SkyblockFlowClient app) {
     this.app = app;
     energy = new EnergySelector(app);
-    var dailyClaims = new DailyClaimsReminder(app);
+    dailyClaims = new DailyClaimsReminder(app);
     InventoryCalculator.register(app);
     net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientLifecycleEvents.CLIENT_STOPPING
         .register(mc -> logos.close());
@@ -58,7 +73,10 @@ public final class GameplayTools {
     ClientTickEvents.END_CLIENT_TICK.register(
         mc -> {
           dailyClaims.tick();
-          pending.values().removeIf(p -> p.expires() < System.nanoTime());
+          if (!pending.isEmpty()) {
+            long now = System.nanoTime();
+            pending.values().removeIf(p -> p.level() != mc.level || p.expires() <= now);
+          }
           energy.tick(mc);
           esports.tick(mc.level != null && app.store.config.tools.esports);
         });
@@ -95,22 +113,27 @@ public final class GameplayTools {
         });
   }
 
+  void reloadPreferences() {
+    dailyClaims.reload();
+  }
+
   public List<String> artisan() {
     return ArtisanMath.rows(
         app.jobs.tracker.data.jobs.get("artisan"), app.store.config.tools.artisanTiers);
   }
 
+  private static String mineral(BlockState state) {
+    String id = BuiltInRegistries.BLOCK.getKey(state.getBlock()).getPath();
+    if (id.equals("ancient_debris")) return id;
+    if (id.endsWith("_ore")) {
+      for (String key : MINERALS) if (id.endsWith(key + "_ore")) return key;
+    }
+    return null;
+  }
+
   public void mined(BlockState state) {
-    String id = BuiltInRegistries.BLOCK.getKey(state.getBlock()).getPath(), mineral = "";
-    for (String key :
-        List.of(
-            "coal", "iron", "copper", "gold", "redstone", "lapis", "diamond", "emerald", "quartz"))
-      if (id.endsWith(key + "_ore")) {
-        mineral = key;
-        break;
-      }
-    if (id.equals("ancient_debris")) mineral = id;
-    if (!mineral.isEmpty()) mined.merge(mineral, 1L, Long::sum);
+    String key = mineral(state);
+    if (key != null) mined.merge(key, 1L, Long::sum);
   }
 
   public void miningXp() {

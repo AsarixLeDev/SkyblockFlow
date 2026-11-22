@@ -26,7 +26,6 @@ import net.minecraft.client.resources.sounds.SoundInstance;
 import net.minecraft.client.sounds.JOrbisAudioStream;
 import net.minecraft.client.sounds.WeighedSoundEvents;
 import net.minecraft.resources.Identifier;
-import net.minecraft.sounds.SoundEvent;
 import net.minecraft.sounds.SoundSource;
 import net.minecraft.util.RandomSource;
 
@@ -101,6 +100,19 @@ public final class SoundService implements AutoCloseable {
   public boolean isSystemPlaying() {
     SourceDataLine line = directLine;
     return line != null && line.isOpen();
+  }
+
+  public List<String> vanillaSounds() {
+    var manager = Minecraft.getInstance().getSoundManager();
+    return manager.getAvailableSounds().stream()
+        .filter(id -> id.getNamespace().equals("minecraft") && playable(manager.getSoundEvent(id)))
+        .map(Identifier::toString)
+        .sorted()
+        .toList();
+  }
+
+  private static boolean playable(WeighedSoundEvents event) {
+    return event != null && event.getWeight() > 0;
   }
 
   public List<String> files() {
@@ -240,6 +252,11 @@ public final class SoundService implements AutoCloseable {
         app.error("Invalid sound ID");
         return;
       }
+      if (!playable(mc.getSoundManager().getSoundEvent(id))) {
+        alarmActive = false;
+        app.error("Vanilla sound is unavailable: " + id);
+        return;
+      }
       if (looping || edit != null) {
         float multiplier =
             looping
@@ -248,9 +265,7 @@ public final class SoundService implements AutoCloseable {
                     * mc.options.getSoundSourceVolume(SoundSource.UI);
         playSystemVanilla(mc, id, volume, rule.pitch, multiplier, looping, bass);
       } else {
-        vanilla =
-            SimpleSoundInstance.forUI(SoundEvent.createVariableRangeEvent(id), rule.pitch, volume);
-        mc.getSoundManager().play(vanilla);
+        playMinecraftVanilla(mc, id, volume, rule.pitch);
       }
       return;
     }
@@ -347,9 +362,9 @@ public final class SoundService implements AutoCloseable {
       boolean looping,
       BassAnalyzer bass) {
     WeighedSoundEvents event = mc.getSoundManager().getSoundEvent(id);
-    if (event == null) {
+    if (!playable(event)) {
       alarmActive = false;
-      app.error("Unknown vanilla sound: " + id);
+      app.error("Vanilla sound is unavailable: " + id);
       return;
     }
     RandomSource random = SoundInstance.createUnseededRandom();
@@ -427,14 +442,7 @@ public final class SoundService implements AutoCloseable {
                               "System audio unavailable; using Minecraft sound: " + e.getMessage());
                           if (looping)
                             playMinecraftLoop(mc, id, volume, pitch, Math.max(1, (int) multiplier));
-                          else {
-                            vanilla =
-                                SimpleSoundInstance.forUI(
-                                    SoundEvent.createVariableRangeEvent(id),
-                                    pitch,
-                                    Math.min(1, volume));
-                            mc.getSoundManager().play(vanilla);
-                          }
+                          else playMinecraftVanilla(mc, id, Math.min(1, volume), pitch);
                         }
                       });
               } finally {
@@ -447,6 +455,13 @@ public final class SoundService implements AutoCloseable {
                 }
               }
             });
+  }
+
+  private void playMinecraftVanilla(Minecraft mc, Identifier id, float volume, float pitch) {
+    vanilla = new SimpleSoundInstance(
+        id, SoundSource.UI, volume, pitch, SoundInstance.createUnseededRandom(),
+        false, 0, SoundInstance.Attenuation.NONE, 0, 0, 0, true);
+    mc.getSoundManager().play(vanilla);
   }
 
   private void playMinecraftLoop(

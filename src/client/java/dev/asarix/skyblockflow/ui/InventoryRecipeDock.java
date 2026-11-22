@@ -41,6 +41,8 @@ public final class InventoryRecipeDock {
     private String query = "";
     private boolean bookmarksVisible = true, bookmarkFilter;
     private int itemPage, bookmarkPage;
+    private int checklistScroll, checklistBatches;
+    private String checklistRecipe = "";
   }
 
   private enum Edge {
@@ -344,6 +346,7 @@ public final class InventoryRecipeDock {
   }
 
   private boolean over(Layout l, double x, double y) {
+    if (l.checklist != null && l.checklist.contains(x, y)) return true;
     if (l.browser.toggle.contains(x, y)) return true;
     if (reveal(System.nanoTime()) <= 0) return false;
     if (l.browser.contains(x, y)) return true;
@@ -367,6 +370,7 @@ public final class InventoryRecipeDock {
       return true;
     }
     ownedButtons |= 1 << event.button();
+    if (l.checklist != null && l.checklist.contains(x, y)) return false;
     if (left && browser.toggle.contains(x, y)) {
       if (browser.edge == Edge.LAUNCHER) {
         if (screen.getMenu().getCarried().isEmpty()) helper.open(screen, null, false, false);
@@ -429,6 +433,12 @@ public final class InventoryRecipeDock {
 
   private boolean allowScroll(double x, double y, double amount) {
     Layout l = layout();
+    if (l.checklist != null && l.checklist.contains(x, y)) {
+      syncChecklist(l.checklist);
+      state.checklistScroll = helper.checklist().offset(l.checklist.h,
+          state.checklistScroll - (int) Math.signum(amount));
+      return false;
+    }
     if (!over(l, x, y)) return true;
     if (target > 0 && amount != 0) {
       boolean bookmarks = overBookmarks(l, x, y);
@@ -477,7 +487,8 @@ public final class InventoryRecipeDock {
     hover = null;
     if (l.checklist != null) {
       var box = l.checklist;
-      helper.drawChecklist(g, box.x, box.y, box.w, box.h, 0);
+      syncChecklist(box);
+      helper.drawChecklist(g, box.x, box.y, box.w, box.h, state.checklistScroll);
     }
     if (browser.edge == Edge.LAUNCHER) {
       button(g, browser.toggle, "‹", false, true, mx, my);
@@ -523,6 +534,17 @@ public final class InventoryRecipeDock {
         if (helper.inspectInside()) helper.inspectBrowser(g, hover.id(), mx, my);
       }
     }
+  }
+
+  private void syncChecklist(Box box) {
+    var settings = helper.settings();
+    if (!state.checklistRecipe.equals(settings.checklistRecipe)
+        || state.checklistBatches != settings.batches) {
+      state.checklistRecipe = settings.checklistRecipe;
+      state.checklistBatches = settings.batches;
+      state.checklistScroll = 0;
+    }
+    state.checklistScroll = helper.checklist().offset(box.h, state.checklistScroll);
   }
 
   private static void beginSlide(GuiGraphicsExtractor g, Box area, Edge edge, float progress) {

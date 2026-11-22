@@ -5,6 +5,7 @@ import dev.asarix.skyblockflow.core.Models.*;
 import java.util.*;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.components.EditBox;
+import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.input.*;
 import org.lwjgl.glfw.GLFW;
 
@@ -26,7 +27,11 @@ public final class FeatureBrowserScreen extends FlowScreen {
   }
 
   public FeatureBrowserScreen(SkyblockFlowClient app) {
-    super(app, null, "Features");
+    this(app, null);
+  }
+
+  public FeatureBrowserScreen(SkyblockFlowClient app, Screen parent) {
+    super(app, parent, "Features");
   }
 
   public static String name(Feature f) {

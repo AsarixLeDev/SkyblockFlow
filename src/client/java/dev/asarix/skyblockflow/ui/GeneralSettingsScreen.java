@@ -49,6 +49,8 @@ public final class GeneralSettingsScreen extends FormScreen {
           }
         });
     action("Restore backup / import JSON", 0, 34, bodyW, () -> chooseImport());
+    action(net.minecraft.network.chat.Component.translatable("skyblockflow.migration.source_title").getString(),
+        0, 68, bodyW, () -> app.openConfigMigration(this));
     page("Profiles");
     action(
         "Export profile with custom sounds",

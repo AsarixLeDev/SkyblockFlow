@@ -29,6 +29,8 @@ public final class WaypointStore implements AutoCloseable {
   }
 
   public void load() {
+    data = new WaypointData();
+    readOnly = false;
     if (!Files.exists(file)) return;
     try {
       if (Files.size(file) > 16 * 1024 * 1024)

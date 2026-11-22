@@ -74,6 +74,7 @@ public final class AlarmHub extends FormScreen {
           "Use {title} or {subtitle} for the original alert text. Leave a field blank to hide it.",
           0,
           164);
+      if (kind == AlarmKind.CHAT) label("Choose each alert’s sound in Chat Alerts.", 0, 182);
       if (kind == AlarmKind.ROCKET)
         label(
             "Warn when boarding with less than 60 seconds of air, or when the server blocks launch"
@@ -121,6 +122,7 @@ public final class AlarmHub extends FormScreen {
               if (app.save()) closeAfterSave();
             });
       }
+      if (kind == AlarmKind.CHAT) return;
       page("Sound");
       toggle(
           "Override trigger sound",
@@ -152,7 +154,7 @@ public final class AlarmHub extends FormScreen {
       draft.title = value("title");
       draft.subtitle = value("sub");
       draft.actionBar = value("bar");
-      if (draft.customSound) {
+      if (kind != AlarmKind.CHAT && draft.customSound) {
         draft.volume = decimal("v", 0, 1);
         draft.pitch = decimal("p", .5f, 2);
         ConfigStore.validateSound(draft);

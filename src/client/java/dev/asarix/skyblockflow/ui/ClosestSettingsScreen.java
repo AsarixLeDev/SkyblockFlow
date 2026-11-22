@@ -16,7 +16,7 @@ public final class ClosestSettingsScreen extends FormScreen {
     field("gap", "Minimum time between clicks (seconds)", "" + draft.commandGapMs / 1000.0, 40);
     field("timeout", "Response timeout (seconds)", "" + draft.responseTimeoutMs / 1000, 86);
     field("pages", "Maximum pages", "" + draft.maxPages, 132);
-    label("Every command waits for your click. There is no automatic refresh.", 0, 190);
+    label("Commands wait for your click. Public API data refreshes separately.", 0, 190);
   }
   protected void commit() {
     draft.commandGapMs = Math.round(decimal("gap", .5f, 60) * 1000);

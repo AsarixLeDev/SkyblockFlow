@@ -36,6 +36,7 @@ public abstract class ChatCompactionMixin implements ChatTabAccess {
   @Unique private Map<GuiMessage, Integer> skyblockflow$groups = Map.of();
   @Unique private boolean skyblockflow$rebuilding;
   @Unique private Tab skyblockflow$tab = Tab.ALL;
+  @Unique private final dev.asarix.skyblockflow.core.PrivateMessages skyblockflow$privatePatterns = new dev.asarix.skyblockflow.core.PrivateMessages();
   @Unique private GuiMessage.Line skyblockflow$anchor;
   @Unique private int skyblockflow$anchorOffset;
   @Unique private boolean skyblockflow$arrivalRewrap;
@@ -49,6 +50,7 @@ public abstract class ChatCompactionMixin implements ChatTabAccess {
   public void skyblockflow$tab(Tab tab) {
     if (tab == skyblockflow$tab) return;
     skyblockflow$tab = tab;
+    skyblockflow$channels.clear();
     chatScrollbarPos = 0;
     newMessageSinceScroll = false;
     skyblockflow$rewrap();
@@ -57,12 +59,15 @@ public abstract class ChatCompactionMixin implements ChatTabAccess {
   @Unique private boolean skyblockflow$matchesTab(GuiMessage message) {
     if (skyblockflow$tab == Tab.ALL) return true;
     byte channel = skyblockflow$channels.computeIfAbsent(message, this::skyblockflow$classify);
-    return channel == 2 || (channel == 1) == (skyblockflow$tab == Tab.CHAT);
+    if (skyblockflow$tab == Tab.MP) return channel == 3;
+    return channel == 2 || channel == 3 || (channel == 1) == (skyblockflow$tab == Tab.CHAT);
   }
 
   @Unique private byte skyblockflow$classify(GuiMessage message) {
-    if (message.source() == GuiMessageSource.PLAYER) return 1;
     String plain = message.content().getString();
+    var app = SkyblockFlowClient.INSTANCE;
+    if (app != null && skyblockflow$privatePatterns.matches(plain, app.store.config.alerts)) return 3;
+    if (message.source() == GuiMessageSource.PLAYER) return 1;
     if (skyblockflow$privateMessage(plain)) return 2;
     var sender = ChatNameHeader.find(plain);
     return (byte) (sender != null && minecraft.getConnection() != null

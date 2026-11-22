@@ -39,6 +39,20 @@ public final class PlayerNames {
 
   public PlayerNames(SkyblockFlowClient app) {
     this.app = app;
+    reloadPreferences();
+  }
+
+  void pauseForConfigReload() {
+    cancelPreparation();
+    disconnect();
+  }
+
+  void reloadPreferences() {
+    enabled = false;
+    showChatBadges = showTabBadges = shareBadge = allowCustomStyle = true;
+    preferencesChanged = false;
+    appearance = null;
+    lastManifest = 0;
     Path consent = consentFile();
     try {
       if (Files.isRegularFile(consent) && Files.size(consent) <= 2048) {
@@ -51,6 +65,7 @@ public final class PlayerNames {
         allowCustomStyle = !doc.has("allowCustomStyle") || doc.get("allowCustomStyle").getAsBoolean();
       }
     } catch (Exception ignored) { enabled = false; }
+    status = enabled ? "Connect to a world" : "Disabled";
     if (enabled) prepareAppearance();
   }
 
@@ -74,10 +89,12 @@ public final class PlayerNames {
           if (task.cancelled) return new Prepared(null, 0, false);
           String envelope = ConfigStore.GSON.toJson(client.get("/v1/appearance"));
           var settings = NameAppearance.verify(envelope, key, task.cached == null ? 0 : task.cached.revision());
-          if (task.cancelled) return new Prepared(null, 0, false);
-          Path temporary = cache.resolveSibling("appearance-startup.tmp");
-          Files.writeString(temporary, envelope);
-          Files.move(temporary, cache, StandardCopyOption.REPLACE_EXISTING);
+          synchronized (task) {
+            if (task.cancelled) return new Prepared(null, 0, false);
+            Path temporary = cache.resolveSibling("appearance-startup.tmp");
+            Files.writeString(temporary, envelope);
+            Files.move(temporary, cache, StandardCopyOption.REPLACE_EXISTING);
+          }
           return new Prepared(settings, System.currentTimeMillis(), false);
         }
       } catch (Exception error) { return new Prepared(task.cached, 0, true); }
@@ -87,7 +104,9 @@ public final class PlayerNames {
   private void cancelPreparation() {
     var old = preparation; preparation = null;
     if (old != null) {
-      old.cancelled = true;
+      synchronized (old) {
+        old.cancelled = true;
+      }
       if (old.client != null) old.client.close();
       if (old.result != null) old.result.cancel(true);
     }

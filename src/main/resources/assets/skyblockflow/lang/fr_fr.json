@@ -1,4 +1,17 @@
 {
+  "skyblockflow.migration.title": "Importer les réglages ExcaliaFlow ?",
+  "skyblockflow.migration.description": "Importer les réglages, repères, historiques et médias depuis %s ? Votre dossier SkyblockFlow actuel sera sauvegardé.",
+  "skyblockflow.migration.import": "Importer les réglages",
+  "skyblockflow.migration.keep_current": "Garder les réglages actuels",
+  "skyblockflow.migration.copying": "Importation des réglages…",
+  "skyblockflow.migration.imported": "Réglages importés et chargés",
+  "skyblockflow.migration.delete_description": "Les réglages importés sont actifs. Votre ancien dossier SkyblockFlow est sauvegardé dans config/%s. Supprimer le dossier d’origine %s ?",
+  "skyblockflow.migration.delete": "Supprimer l’ancien dossier",
+  "skyblockflow.migration.keep_old": "Garder l’ancien dossier",
+  "skyblockflow.migration.deleting": "Suppression de l’ancien dossier…",
+  "skyblockflow.migration.decline_error": "Impossible d’enregistrer votre choix. %s",
+  "skyblockflow.migration.import_error": "Impossible d’importer les anciens réglages. %s",
+  "skyblockflow.migration.delete_error": "Les réglages ont été importés. L’ancien dossier n’a pas pu être entièrement supprimé. %s",
   "key.skyblockflow.editor": "Ouvrir les fonctionnalités",
   "key.categories.skyblockflow.controls": "SkyblockFlow",
   "key.skyblockflow.bindings": "Ouvrir les raccourcis de commandes",
@@ -8,5 +21,12 @@
   "key.skyblockflow.recipe.uses": "Voir les utilisations",
   "key.skyblockflow.recipe.pin": "Épingler une recette",
   "key.skyblockflow.recipe.materials": "Calculer les ressources brutes",
-  "key.skyblockflow.recipe.craft": "Placer la recette ou afficher le guide"
+  "key.skyblockflow.recipe.craft": "Placer la recette ou afficher le guide",
+  "skyblockflow.migration.source_title": "Importer le dossier ExcaliaFlow",
+  "skyblockflow.migration.source_description": "Déposez ici l’ancien dossier excaliaflow ou le fichier excaliaflow.json. Vous pouvez aussi coller son chemin.",
+  "skyblockflow.migration.source_disconnect": "Choisissez d’abord l’ancien dossier. Vous serez déconnecté avant de confirmer l’importation.",
+  "skyblockflow.migration.source_disconnect_continue": "Se déconnecter et vérifier l’importation",
+  "skyblockflow.migration.source_folder": "Ancien dossier ou fichier de configuration",
+  "skyblockflow.migration.source_continue": "Vérifier l’importation",
+  "skyblockflow.migration.source_missing": "Choisissez un dossier excaliaflow qui contient le fichier excaliaflow.json."
 }
