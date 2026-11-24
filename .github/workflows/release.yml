@@ -43,6 +43,7 @@ jobs:
           jar="skyblockflow-$jar_version.jar"
           cd build/libs
           (cd ../.. && python3 tools/release.py --ref "$GITHUB_REF" --verify-jar "build/libs/$jar")
-          sha256sum "$jar" ../release/CHANGE_DETAILS.txt > ../release/SHA256SUMS
+          sha256sum "$jar" > ../release/SHA256SUMS
+          (cd ../release && sha256sum CHANGE_DETAILS.txt >> SHA256SUMS)
           title=$(sed -n '1s/^# //p' ../release/RELEASE_NOTES.md)
           gh release create "$GITHUB_REF_NAME" --verify-tag "${flags[@]}" --title "$title" --notes-file ../release/RELEASE_NOTES.md "$jar" ../release/SHA256SUMS ../release/CHANGE_DETAILS.txt
