@@ -10,7 +10,7 @@ import net.minecraft.world.item.Items;
 
 /** Passive reader of server-owned slots and unsigned server messages. */
 public final class IslandMeasurements {
-  private static final long FRESH = 60_000;
+  private static final long FRESH = ExcaliaApiClient.MAX_QUOTE_AGE;
   private static final Pattern PAGE =
       Pattern.compile("(?m)\\bpage *:? *(\\d{1,4}) */ *(\\d{1,4})\\b");
   private static final Pattern TOTAL =
@@ -50,7 +50,7 @@ public final class IslandMeasurements {
     service.history.owner = evidenceOwner = owner; ownerUntil = 0; needOwner = false;
     service.saveHistory();
     // Re-evaluate the page currently on screen when /is info arrives after its contents.
-    if (!lastItems.isEmpty()) observe(lastItems, lastPage, lastPages, -1, Minecraft.getInstance().getUser().getName(), now);
+
   }
   private boolean reserveScreen;
   private long visitsUntil;
@@ -61,7 +61,7 @@ public final class IslandMeasurements {
   private IslandBoard.Proposal proposal;
   private long ownPower = -1, powerAt;
   private boolean awardConsumed;
-  public String status = "Open /is visits to observe a page", estimate = "Unknown";
+  public String status = "Waiting for public island rankings", estimate = "Unknown";
   public List<String> samples = List.of();
 
   IslandMeasurements(ClosestPlayerService service) {
@@ -213,20 +213,8 @@ public final class IslandMeasurements {
     if (requestedVisitsMenu != screen) requestedVisitsMenu = null;
     boolean reserve = title.contains("reserve") || reserveUntil >= now && title.contains("conver");
     reserveScreen = reserve;
-    boolean namedVisits = isVisitsTitle(title);
-    if (namedVisits && service.history.owner.isEmpty() && !askedOwner) needOwner = true;
-    boolean visits =
-        !title.contains("reputation") && (namedVisits || requestedVisitsMenu == screen);
-    if (!reserve && !visits && ownerUntil >= now) {
-      for (var slot : chest.getMenu().slots) if (slot.container != mc.player.getInventory()) {
-        var item = slot.getItem(); var lore = item.get(DataComponents.LORE);
-        readOwner(item.getHoverName().getString() + "\n" + (lore == null ? "" : String.join("\n", lore.lines().stream().map(c -> c.getString()).toList())), now);
-      }
-    }
-    if (!reserve && !visits) {
-      reserveUntil = 0;
-      proposal = null;
-      return;
+    if (!reserve) {
+      reserveUntil = 0; proposal = null; return;
     }
     if (revision != inventoryRevision) {
       revision = inventoryRevision;
@@ -234,14 +222,7 @@ public final class IslandMeasurements {
     }
     if (stableAt == 0 || now - stableAt < 400) return;
     stableAt = 0;
-    List<String> items = new ArrayList<>();
-    int page = 0, pages = 0, total = -1;
     IslandBoard.Proposal preview = null;
-    var titlePage = PAGE.matcher(title);
-    if (titlePage.find()) {
-      page = Integer.parseInt(titlePage.group(1));
-      pages = Integer.parseInt(titlePage.group(2));
-    }
     for (var slot : chest.getMenu().slots) {
       if (slot.container == mc.player.getInventory() || slot.getItem().isEmpty()) continue;
       var stack = slot.getItem();
@@ -253,37 +234,12 @@ public final class IslandMeasurements {
         raw.append('\n').append(line.getString());
       }
       if (raw.length() > 2048) continue;
-      if (reserve) {
-        reserveUntil = now + 30000;
-        var candidate = IslandBoard.proposal(raw.toString());
-        if (candidate != null) preview = candidate;
-      } else if (stack.is(Items.PLAYER_HEAD) || stack.is(Items.IRON_BARS))
-        items.add(raw.toString());
-      else {
-        String info = JobXp.normalize(raw.toString());
-        var count = TOTAL.matcher(info);
-        if (count.find()) total = Integer.parseInt(count.group(1));
-        var m = PAGE.matcher(info);
-        if (m.find()) {
-          page = Integer.parseInt(m.group(1));
-          pages = Integer.parseInt(m.group(2));
-        }
-      }
+      reserveUntil = now + 30000;
+      var candidate = IslandBoard.proposal(raw.toString());
+      if (candidate != null) preview=candidate;
     }
-    if (reserve) {
-      if (preview != null && !preview.equals(proposal)) awardConsumed = false;
-      proposal = preview;
-    }
-    if (visits && page == 0) page = pageHint;
-    if (visits && (page != lastPage || pages != lastPages || !items.equals(lastItems))) {
-      lastPage = page;
-      lastPages = pages;
-      lastItems = List.copyOf(items);
-      if (!namedVisits && requestedVisitsMenu != screen) {
-        samples = List.copyOf(items);
-        status = "Unrecognized visits menu · sample available for preview";
-      } else observe(items, page, pages, total, mc.player.getGameProfile().name(), now);
-    }
+    if (preview != null && !preview.equals(proposal)) awardConsumed=false;
+    proposal=preview;
   }
 
   void observe(List<String> items, int page, int pages, int total, String self, long now) {

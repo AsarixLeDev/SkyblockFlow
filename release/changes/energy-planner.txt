@@ -1,0 +1,4 @@
+Type: Feature
+Author: Asarix
+Summary: Estimate energy production and overnight capacity.
+Details: The planner compares consumption with production and stored energy.

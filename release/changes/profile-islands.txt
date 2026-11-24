@@ -1,0 +1,4 @@
+Type: Feature
+Author: Asarix
+Summary: Explore island standings and neighboring islands.
+Details: Compare power, browse members and open player profiles from the island view.

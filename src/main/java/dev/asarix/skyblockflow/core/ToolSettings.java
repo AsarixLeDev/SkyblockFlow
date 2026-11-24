@@ -4,6 +4,8 @@ import java.util.*;
 
 public final class ToolSettings {
   public boolean calculator = true, shopValues = true, clock = true, fancyClock = true;
+  public boolean craftingValues = true;
+  public IslandFlightSettings islandFlight = new IslandFlightSettings();
   public boolean minerals = true, artisan, ancientDebris, esports;
   public boolean esportsHideInactive = true, esportsShowUpdated = false;
   public boolean dailyClaims = true;
@@ -54,6 +56,8 @@ public final class ToolSettings {
       p.scale = Float.isFinite(p.scale) ? Math.clamp(p.scale, .5f, 3) : 1;
     }
     if (recipes == null) recipes = new RecipeSettings();
+    if (islandFlight == null) islandFlight = new IslandFlightSettings();
+    islandFlight.normalize();
     recipes.normalize();
     if (publicData == null) publicData = new ExcaliaApiSettings();
     if (energy == null) energy = new EnergyPlan();

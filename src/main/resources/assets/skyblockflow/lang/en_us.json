@@ -34,5 +34,6 @@
   "skyblockflow.migration.source_disconnect_continue": "Disconnect and review import",
   "skyblockflow.migration.source_folder": "Old configuration folder or file",
   "skyblockflow.migration.source_continue": "Review import",
-  "skyblockflow.migration.source_missing": "Choose an excaliaflow folder that contains excaliaflow.json."
+  "skyblockflow.migration.source_missing": "Choose an excaliaflow folder that contains excaliaflow.json.",
+  "key.skyblockflow.recipe.cost_details": "Hold for crafting ingredients"
 }

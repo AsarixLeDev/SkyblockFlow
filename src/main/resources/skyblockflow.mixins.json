@@ -9,6 +9,7 @@
     "SharedEditKeyMixin",
     "KeyMappingAccess",
     "InventoryUpdateMixin",
+    "IslandFlightPositionMixin",
     "MineralMiningMixin",
     "MineralConfirmationMixin",
     "JobBossBarMixin",
@@ -36,7 +37,12 @@
     "RemoteTerrainMixin",
     "JobBossVisibilityMixin",
     "JobCommandMixin",
-    "IslandPageMixin"
+    "IslandPageMixin",
+    "TooltipTextAccess",
+    "ScrollableTooltipMixin",
+    "TooltipWheelMixin",
+    "SackBadgeMixin",
+    "IslandTabAccess"
   ],
   "injectors": {
     "defaultRequire": 1

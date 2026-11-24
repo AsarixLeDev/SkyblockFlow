@@ -1,0 +1,4 @@
+Type: Improvement
+Author: Asarix
+Summary: Publish consistent patch notes and detailed change records.
+Details: Each release carries a readable details file. Public notes collect changes across the entire development cycle.

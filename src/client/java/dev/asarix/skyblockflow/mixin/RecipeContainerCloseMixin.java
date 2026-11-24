@@ -14,6 +14,7 @@ abstract class RecipeContainerCloseMixin {
       target = "Lnet/minecraft/client/gui/Gui;setScreen(Lnet/minecraft/client/gui/screens/Screen;)V"))
   private void skyblockflow$keepRecipeViewer(Gui gui, Screen next) {
     var app = SkyblockFlowClient.INSTANCE;
+    if(app!=null && app.excaliaApi!=null && app.excaliaApi.inspections.keepViewer(gui.screen()))return;
     if (app == null || app.recipes == null || !app.recipes.keepCraftViewer(gui.screen()))
       gui.setScreen(next);
   }

@@ -59,6 +59,7 @@ public final class FeatureBrowserScreen extends FlowScreen {
       case ENERGY -> "Energy planner";
       case ESPORTS -> "Rocket League";
       case COMMUNITY_NAMES -> "Community names";
+      case ISLAND_FLIGHT -> "Island flight";
     };
   }
 
@@ -88,12 +89,13 @@ public final class FeatureBrowserScreen extends FlowScreen {
       case ENERGY -> "Solar, batteries, nuclear fuel and machine selection.";
       case ESPORTS -> "Live Rocket League series from Liquipedia.";
       case COMMUNITY_NAMES -> "Optional SF badges, name colors, gradients and fonts in tab and chat.";
+      case ISLAND_FLIGHT -> "Use /fly enable on your island · VIP and higher · learns /is go and /is tp.";
     };
   }
 
   public static String category(Feature f) {
     return switch (f) {
-      case JOBS, PETS, WAYPOINTS, SPAWNERS, LEADERBOARDS, SHARED_EDITS -> "Gameplay";
+      case JOBS, PETS, WAYPOINTS, SPAWNERS, LEADERBOARDS, SHARED_EDITS, ISLAND_FLIGHT -> "Gameplay";
       case ALARMS, CHAT, COORDINATES, TIMERS -> "Alerts";
       default -> "Tools";
     };
@@ -127,6 +129,7 @@ public final class FeatureBrowserScreen extends FlowScreen {
           case MINERALS -> c.tools.minerals;
           case ARTISAN -> c.tools.artisan;
           case ESPORTS -> c.tools.esports;
+          case ISLAND_FLIGHT -> c.tools.islandFlight.enabled && SkyblockFlowClient.INSTANCE.islandFlight.rank() != dev.asarix.skyblockflow.core.IslandFlightLogic.Rank.CITIZEN;
           default -> true;
         };
   }
@@ -141,6 +144,7 @@ public final class FeatureBrowserScreen extends FlowScreen {
     }
     var c = app.store.config;
     boolean on = !enabled(c, f);
+    if (f == Feature.ISLAND_FLIGHT && !app.islandFlight.setEnabled(on)) { notice = app.islandFlight.status; return; }
     if (f == Feature.SHARED_EDITS && on) {
       var draft = dev.asarix.skyblockflow.core.ConfigStore.copy(app.shared.settings, dev.asarix.skyblockflow.SharedEdits.Settings.class);
       minecraft.gui.setScreen(new SharedEditTrustScreen(app, this, draft.relayUrl, () -> {
@@ -193,6 +197,7 @@ public final class FeatureBrowserScreen extends FlowScreen {
           case ALARMS -> new AlarmHub(app, this);
           case OVERLAY -> new OverlayHub(app, this);
           case COMMUNITY_NAMES -> new PlayerNamesScreen(app, this);
+          case ISLAND_FLIGHT -> new IslandFlightScreen(app, this);
           case WAYPOINTS -> new WaypointScreen(app, this);
           case SPAWNERS -> new SpawnerSettingsScreen(app, this);
           case ENERGY -> new EnergyScreen(app, this);

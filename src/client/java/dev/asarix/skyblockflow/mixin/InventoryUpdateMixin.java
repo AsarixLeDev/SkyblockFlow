@@ -10,6 +10,13 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 @Mixin(ClientPacketListener.class)
 public abstract class InventoryUpdateMixin {
+  @Inject(method="handleOpenScreen",at=@At(value="INVOKE",
+      target="Lnet/minecraft/client/gui/screens/MenuScreens;create(Lnet/minecraft/world/inventory/MenuType;Lnet/minecraft/client/Minecraft;ILnet/minecraft/network/chat/Component;)V"),cancellable=true)
+  private void captureInspection(ClientboundOpenScreenPacket packet,CallbackInfo ci){
+    var app=SkyblockFlowClient.INSTANCE;
+    if(app!=null && app.excaliaApi!=null && app.excaliaApi.inspections.openBackground(packet))ci.cancel();
+  }
+
   @Inject(method = "handleContainerSetSlot", at = @At("TAIL"))
   private void slot(ClientboundContainerSetSlotPacket packet, CallbackInfo ci) {
     changed();

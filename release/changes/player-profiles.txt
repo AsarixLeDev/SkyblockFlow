@@ -1,0 +1,4 @@
+Type: Feature
+Author: Asarix
+Summary: Browse player profiles in a tabbed dashboard.
+Details: Inspect online players for extra details. Cached observations carry their age when a player is offline.

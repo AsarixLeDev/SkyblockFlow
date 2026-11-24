@@ -29,9 +29,9 @@ import net.minecraft.world.item.ItemStack;
 
 /** A compact item index, bookmark shelf, and recipe viewer. */
 public final class RecipeScreen extends Screen {
-  private enum View { RECIPES, USES, PINS }
+  private enum View { RECIPES, USES, BUY, PINS }
   private record Hit(String item, Recipe recipe) {}
-  static final Identifier TOOLTIP_STYLE = Identifier.fromNamespaceAndPath("skyblockflow", "recipe");
+  public static final Identifier TOOLTIP_STYLE = Identifier.fromNamespaceAndPath("skyblockflow", "recipe");
   private static final int TILE = 18;
   private static final int SLOT = 0xff151e2a;
   private final RecipeHelper helper;
@@ -44,9 +44,10 @@ public final class RecipeScreen extends Screen {
   private RecipeCatalog indexed;
   private List<ItemTile> filtered = List.of();
   private List<Recipe> results = List.of(), pins = List.of();
+  private List<RecipeHelper.PurchaseSource> purchases = List.of();
   private String query = "";
   private Hit hover;
-  private FlowButton pin, materialsButton, craft, prev, next;
+  private FlowButton pin, materialsButton, craft, prev, next, buy;
   private int x, y, w, h, right, itemCols, itemRows, leftCols, itemPage, pinPage, recipePage, checklistScroll;
   private int searchY;
   private long lastClick;
@@ -75,11 +76,14 @@ public final class RecipeScreen extends Screen {
     searchY = height - 21;
     itemRows = Math.max(1, (searchY - 24) / TILE);
     int header = y + 5;
-    int half = (w - 17) / 2;
-    add(x + 6, y - 18, half, "Recipes", view == View.RECIPES,
+    int third = (w - 16) / 3;
+    add(x + 6, y - 18, third, "Recipes", view == View.RECIPES,
         () -> changeView(View.RECIPES)).setTooltip(tip("Recipes · " + helper.keyName(Action.RECIPES)));
-    add(x + 8 + half, y - 18, half, "Uses", view == View.USES,
-        () -> changeView(View.USES)).setTooltip(tip("Uses and obtainment · " + helper.keyName(Action.USES)));
+    add(x + 8 + third, y - 18, third, "Uses", view == View.USES,
+        () -> changeView(View.USES)).setTooltip(tip("Uses · " + helper.keyName(Action.USES)));
+    buy = add(x + 10 + third * 2, y - 18, third, "Buy", view == View.BUY,
+        () -> changeView(View.BUY));
+    buy.setTooltip(tip("Where to buy this item · shops, islands and prices"));
     int pageY = header + 18;
     prev = add(x + 6, pageY, 16, "‹", () -> pageRecipe(-1));
     next = add(x + w - 22, pageY, 16, "›", () -> pageRecipe(1));
@@ -225,18 +229,24 @@ public final class RecipeScreen extends Screen {
       case PINS -> pins;
       case USES -> item == null ? List.of() : indexed.uses(item);
       case RECIPES -> item == null ? List.of() : indexed.produces(helper.recipeLookup(item));
+      case BUY -> List.of();
     };
-    int known = results.indexOf(selected);
+    purchases = helper.purchaseSources(item);
+    int known = selected == null ? -1 : results.indexOf(selected);
     if (known >= 0) recipePage = known;
-    select(Math.clamp(recipePage, 0, Math.max(0, results.size() - 1)));
+    select(Math.clamp(recipePage, 0, Math.max(0, pageCount() - 1)));
   }
+
+  private int pageCount() { return view == View.BUY ? purchases.size() : results.size(); }
 
   private void select(int page) {
     recipePage = page;
     selected = results.isEmpty() ? null : results.get(recipePage);
     boolean present = selected != null;
-    prev.active = next.active = results.size() > 1;
+    prev.active = next.active = pageCount() > 1;
+    buy.setMessage(Component.literal(purchases.isEmpty() ? "Buy" : "Buy •"));
     pin.active = materialsButton.active = present;
+    pin.visible = materialsButton.visible = craft.visible = view != View.BUY;
     if (present) pin.setMessage(Component.literal(helper.pinned(selected) ? "Unpin" : "Pin"));
     if (!present || !helper.canCraft(selected)) craftGuide = false;
     materialsButton.setMessage(Component.literal(materials ? "Recipe" : "Materials"));
@@ -244,35 +254,40 @@ public final class RecipeScreen extends Screen {
     updateCraftButton();
   }
 
+  public String requestedItem() { return view == View.RECIPES ? item : null; }
+
+  public void refreshCraftButton() { currentCraftButton = null; updateCraftButton(); }
+
   private void updateCraftButton() {
     var state = helper.craftButton(this, selected, tableParent());
     if (currentCraftButton == state) return;
     currentCraftButton = state;
-    craft.active = !options && selected != null && helper.canCraft(selected)
+    craft.active = !options && (selected != null && helper.canCraft(selected)
+        || selected == null && helper.onExcalia() && requestedItem() != null && !requestedItem().startsWith("minecraft:"))
         && (craftGuide || state != CraftButton.LOADING && state != CraftButton.APPLYING);
     craft.setMessage(Component.literal(craftGuide ? "Grid" : switch (state) {
       case CRAFT -> "Craft";
-      case OPEN -> "Open";
+      case OPEN -> "Craft";
       case RETRY -> "Retry";
       case LOADING -> "Wait…";
       case APPLYING -> "Apply…";
-      case BOOK -> "Book";
       case GUIDE -> "Guide";
     }));
     craft.setTooltip(tip(craftGuide ? "Show the recipe grid" : switch (state) {
-      case CRAFT -> helper.serverId(selected) != null
-          ? "Fill the crafting grid · Shift-click for max"
-          : "Appliquer la recette · Shift-click forwards Shift";
+      case CRAFT -> "Fill the crafting grid · Shift-click for max";
       case OPEN -> "Open the server's crafting menu";
       case RETRY -> "The crafting menu did not open · click to retry";
       case LOADING -> "Waiting for the crafting menu";
       case APPLYING -> "Waiting for the server to apply the recipe";
-      case BOOK -> "Open the server book to choose the correct recipe";
       case GUIDE -> "Crafting instructions";
     }));
   }
 
   private void pageRecipe(int delta) {
+    if (view == View.BUY) {
+      if (!purchases.isEmpty()) select(Math.floorMod(recipePage + delta, purchases.size()));
+      return;
+    }
     if (results.size() < 2) return;
     selected = null;
     int page = Math.floorMod(recipePage + delta, results.size());
@@ -299,7 +314,7 @@ public final class RecipeScreen extends Screen {
   }
 
   private void craft(boolean max) {
-    if (selected == null || !craft.active) return;
+    if (!craft.active) return;
     if (craftGuide) {
       craftGuide = false;
       select(recipePage);
@@ -327,6 +342,11 @@ public final class RecipeScreen extends Screen {
       updateResults();
     }
     updateCraftButton();
+    var updated = helper.purchaseSources(item);
+    if (!updated.equals(purchases)) {
+      purchases = updated;
+      select(Math.clamp(recipePage, 0, Math.max(0, pageCount() - 1)));
+    }
   }
 
   @Override
@@ -367,6 +387,12 @@ public final class RecipeScreen extends Screen {
   @Override
   public boolean mouseClicked(MouseButtonEvent event, boolean twice) {
     double mx = event.x(), my = event.y();
+    if (event.button() == 0 && !options && !materials && !craftGuide && selected != null
+        && !helper.purchaseSources(selected.output()).isEmpty()
+        && inside(mx, my, x + 7, y + h - 39, w - 14, 13)) {
+      show(selected.output(), View.BUY, null);
+      return true;
+    }
     if (event.button() == 0 && craft.active && craft.isMouseOver(mx, my) && event.hasShiftDown()) {
       lastItemClick = null;
       craft(true);
@@ -396,6 +422,8 @@ public final class RecipeScreen extends Screen {
       } else if (target.recipe() != null && target.recipe().equals(selected)) {
         helper.prepareCraft(this, selected, tableParent());
         updateCraftButton();
+      } else {
+        show(target.item(), event.button() == 1 ? View.USES : View.RECIPES, recipe);
       }
       return true;
     }
@@ -468,10 +496,10 @@ public final class RecipeScreen extends Screen {
     int rightWidth = itemCols * TILE;
     centered(g, (itemPage + 1) + "/" + itemPages(), right + rightWidth / 2, 8, MUTED);
     Ui.surface(g, x, y, w, h, PANEL, BORDER);
-    String title = view == View.PINS ? "Pinned recipes" : selected == null ? "Recipes" : stationLabel(selected);
+    String title = view == View.BUY ? "Where to buy" : view == View.PINS ? "Pinned recipes" : selected == null ? "Recipes" : stationLabel(selected);
     centered(g, title, x + w / 2, y + 8, TEXT);
     Ui.rounded(g, x + 24, y + 24, w - 48, 14, 4, CARD);
-    centered(g, results.isEmpty() ? "0/0" : (recipePage + 1) + "/" + results.size(),
+    centered(g, pageCount() == 0 ? "0/0" : (recipePage + 1) + "/" + pageCount(),
         x + w / 2, y + 27, MUTED);
 
     if (options) {
@@ -479,6 +507,8 @@ public final class RecipeScreen extends Screen {
       centered(g, "Recipe helper settings", x + w / 2, y + 53, ACCENT);
     } else if (materials && helper.materialRecipe() != null) {
       helper.drawChecklist(g, x + 6, y + 62, w - 12, h - 86, checklistScroll);
+    } else if (view == View.BUY) {
+      drawPurchase(g, mouseX, mouseY);
     } else if (selected != null) {
       if (craftGuide) drawCraftGuide(g);
       else drawRecipe(g, mouseX, mouseY);
@@ -488,13 +518,45 @@ public final class RecipeScreen extends Screen {
     } else if (item != null) {
       g.item(helper.icon(item), x + w / 2 - 8, y + 58);
       centered(g, cut(helper.name(item), w - 18), x + w / 2, y + 80, TEXT);
-      centered(g, view == View.USES ? "No known uses" : "No known recipe", x + w / 2, y + 93, MUTED);
+      centered(g, view == View.USES ? "No known uses" : purchases.isEmpty() ? "No known recipe" : "Available to buy", x + w / 2, y + 93, MUTED);
+      if (view == View.RECIPES && !purchases.isEmpty()) {
+        centered(g, cut(purchases.getFirst().source(), w - 20), x + w / 2, y + 110, ACCENT);
+        centered(g, cut(purchases.getFirst().price(), w - 20), x + w / 2, y + 124, FlowScreen.GOLD);
+        centered(g, "See Buy for all sources", x + w / 2, y + 143, MUTED);
+      }
     }
     super.extractRenderState(g, mouseX, mouseY, dt);
     if (hover != null) {
-      g.setTooltipForNextFrame(font, Ui.label(helper.name(hover.item())), mouseX, mouseY, TOOLTIP_STYLE);
+      helper.browserTooltip(g, hover.item(), mouseX, mouseY, false);
       if (helper.inspectInside()) helper.inspectBrowser(g, hover.item(), mouseX, mouseY);
     }
+  }
+
+  private void drawPurchase(GuiGraphicsExtractor g, int mx, int my) {
+    int top = y + 44, end = y + h - 8;
+    Ui.surface(g, x + 7, top, w - 14, end - top, CARD, BORDER);
+    if (item == null) return;
+    int center = x + w / 2;
+    g.item(helper.icon(item), center - 8, top + 7);
+    if (inside(mx, my, center - 9, top + 6, 18, 18)) hover = new Hit(item, null);
+    centered(g, cut(helper.name(item), w - 28), center, top + 28, TEXT);
+    if (purchases.isEmpty()) {
+      centered(g, "No known seller", center, top + 49, MUTED);
+      return;
+    }
+    var source = purchases.get(Math.min(recipePage, purchases.size() - 1));
+    int line = top + 49;
+    int spacing = Math.min(19, Math.max(11, (end - line - 14) / 4));
+    for (var label : List.of(source.source(), source.price(), source.destination(), source.stock())) {
+      centered(g, cut(label, w - 26), center, line, line == top + 49 ? ACCENT
+          : label.equals(source.price()) ? FlowScreen.GOLD : MUTED);
+      line += spacing;
+    }
+    boolean truncated = List.of(source.source(), source.price(), source.destination(), source.stock()).stream()
+        .anyMatch(label -> font.width(Ui.label(label)) > w - 26);
+    if (truncated && inside(mx, my, x + 8, top + 46, w - 16, end - top - 46))
+      g.setComponentTooltipForNextFrame(font, List.of(Ui.label(source.source()), Ui.label(source.price()),
+          Ui.label(source.destination()), Ui.label(source.stock())), mx, my, TOOLTIP_STYLE);
   }
 
   private void drawCraftGuide(GuiGraphicsExtractor g) {
@@ -505,7 +567,7 @@ public final class RecipeScreen extends Screen {
         ? List.of("Open /cc", "Open the recipe book", "Select the recipe", "Appliquer la recette")
         : helper.serverId(selected) != null
             ? List.of("Open a regular crafting table", "Find this recipe in the helper",
-                "Click Place · Shift-click for max")
+                "Click Craft · Shift-click for max")
             : List.of("Open a regular crafting table", "Use the grid to place ingredients");
     centered(g, excalia ? "Excalia recipe book" : "Crafting table", x + w / 2, top + 13, ACCENT);
     for (int i = 0; i < steps.size(); i++)
@@ -550,6 +612,16 @@ public final class RecipeScreen extends Screen {
     int top = y + 44;
     int end = y + h - 26;
     var recipe = selected;
+    var sources = helper.purchaseSources(recipe.output());
+    if (!sources.isEmpty()) {
+      var source = sources.getFirst();
+      String label = "Buy · " + source.source() + " · " + source.price();
+      Ui.rounded(g, x + 7, end - 13, w - 14, 13, 3, 0xff25392f);
+      centered(g, cut(label, w - 22), x + w / 2, end - 10, FlowScreen.GOLD);
+      if (inside(mouseX, mouseY, x + 7, end - 13, w - 14, 13))
+        g.setComponentTooltipForNextFrame(font, List.of(Ui.label(label), Ui.label("Open Buy for every source")), mouseX, mouseY, TOOLTIP_STYLE);
+      end -= 16;
+    }
     Ui.surface(g, x + 7, top, w - 14, end - top, CARD, BORDER);
     if (recipe.hasGrid()) {
       int size = Math.min(18, Math.min((w - 49) / recipe.size(), (end - top - 20) / recipe.size()));
@@ -580,7 +652,7 @@ public final class RecipeScreen extends Screen {
         String input = req.choices().getFirst();
         slot(g, x + 12, iy, TILE);
         drawIngredient(g, input, req.amount(), x + 12, iy, TILE);
-        Ui.text(g, cut(req.amount() + " × " + helper.name(input), w - 47), x + 34, iy + 5, TEXT);
+        Ui.text(g, cut(dev.asarix.skyblockflow.core.Numbers.integer(req.amount()) + " × " + helper.name(input), w - 47), x + 34, iy + 5, TEXT);
         if (inside(mouseX, mouseY, x + 12, iy, TILE, TILE)) hover = new Hit(input, null);
         iy += TILE;
       }

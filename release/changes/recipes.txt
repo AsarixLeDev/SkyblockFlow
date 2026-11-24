@@ -1,0 +1,4 @@
+Type: Feature
+Author: Asarix
+Summary: Browse recipes, uses, favorites and raw materials.
+Details: The inventory recipe helper includes a scrollable material checklist with missing items first.

@@ -37,6 +37,8 @@ public final class ToolsScreen extends FormScreen {
         label("Earn job XP first so the mod knows your current level.", 0, 62);
         action("Public prices & rankings", 0, 100, bodyW,
             () -> minecraft.gui.setScreen(new PublicDataScreen(app, this)));
+        toggle("Show cheapest crafting value", draft.craftingValues, 140, () -> draft.craftingValues = !draft.craftingValues);
+        label("Hold the ingredient-details key (C by default) over an item.", 0, 180);
       }
       case "Clock" -> {
         toggle("Show game time", draft.clock, 0, () -> draft.clock = !draft.clock);
@@ -167,7 +169,7 @@ public final class ToolsScreen extends FormScreen {
     var live = app.store.config.tools;
     switch (tool) {
       case "Calculator" -> live.calculator = draft.calculator;
-      case "Shop values" -> live.shopValues = draft.shopValues;
+      case "Shop values" -> { live.shopValues = draft.shopValues; live.craftingValues = draft.craftingValues; }
       case "Clock" -> {
         live.clock = draft.clock;
         live.fancyClock = draft.fancyClock;

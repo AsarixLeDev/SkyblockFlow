@@ -1,0 +1,4 @@
+Type: Improvement
+Author: Asarix
+Summary: Recognize Rocket League teams by their available logos.
+Details: Unknown logos have a fallback icon.

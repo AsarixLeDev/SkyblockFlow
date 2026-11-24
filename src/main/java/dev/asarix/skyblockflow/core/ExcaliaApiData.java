@@ -12,14 +12,35 @@ public final class ExcaliaApiData {
   public record Jobs(Map<String, List<JobEntry>> boards, long at) {}
   public record Island(UUID id, UUID ownerId, String owner, int rank, long power) {}
   public record Islands(List<Island> ranked, List<Island> known, long at) {}
-  public record IslandDetail(UUID id, UUID ownerId, String owner, Set<UUID> members, long power) {}
-  public record Offer(String key, String type, String name, String owner, BigDecimal price,
-                      long stock, boolean unlimited) {}
+  public record Member(String name,String role,Instant joined) {}
+  public record IslandDetail(UUID id, UUID ownerId, String owner, Set<UUID> members, long power,
+      List<Member> roster,Instant created,BigDecimal bank,int size,String generator) {}
+  public record Wallet(int rank,String name,BigDecimal balance) {}
+  public static List<Wallet> wallets(JsonObject root) {
+    var rows=new ArrayList<Wallet>();
+    for(var e:array(root,"top")){
+      var r=e.getAsJsonObject(); String name=player(r,"name");
+      int rank=r.has("rank")?(int)integer(r,"rank",1,1000000):rows.size()+1;
+      rows.add(new Wallet(rank,name,number(r,"balance")));
+    }
+    rows.sort(Comparator.comparingInt(Wallet::rank));return List.copyOf(rows);
+  }
+  private static Instant date(JsonObject object,String key) {
+    try{return Instant.parse(text(object,key));}catch(RuntimeException missing){return null;}
+  }
+  public record Offer(String shop, String key, String type, String name, String owner, BigDecimal price,
+                      long stock, boolean unlimited) {
+    public Offer(String key, String type, String name, String owner, BigDecimal price, long stock, boolean unlimited) {
+      this("", key, type, name, owner, price, stock, unlimited);
+    }
+    public String identity() { return shop.isEmpty() ? owner + "\u0000" + key + "\u0000" + price.toPlainString() : shop + "\u0000" + key; }
+    public Offer withStock(long remaining) { return new Offer(shop, key, type, name, owner, price, remaining, unlimited); }
+  }
   public record Market(Map<String, List<Offer>> selling, Map<String, List<Offer>> buying, long at) {
     public List<String> lines(String type, String name, int count) {
       var lines = new ArrayList<String>();
-      quote(lines, selling.getOrDefault(type, List.of()), name, count, false);
-      quote(lines, buying.getOrDefault(type, List.of()), name, count, true);
+      quote(lines, best(selling.getOrDefault(type, List.of()), name, false), count, false);
+      quote(lines, best(buying.getOrDefault(type, List.of()), name, true), count, true);
       return List.copyOf(lines);
     }
   }
@@ -56,7 +77,7 @@ public final class ExcaliaApiData {
       long required = JobXp.requirement(job, level);
       // XP at the level cap is retained by the server but no longer advances the level.
       rows.add(new JobEntry(id, name, rows.size() + 1,
-          new JobXp.Reading(job, level, level == 200 ? 0 : xp, required, 0)));
+          new JobXp.Reading(job, level, JobXp.levelProgress(job, level, xp), required, 0)));
       if (rows.size() > 2048) throw new IllegalArgumentException("Oversized ranking");
     }
     return List.copyOf(rows);
@@ -84,9 +105,11 @@ public final class ExcaliaApiData {
   }
 
   public static IslandDetail detail(JsonObject root) {
+    var roster=new ArrayList<Member>();
     var members = new HashSet<UUID>(); UUID ownerId = null; String owner = "";
     for (var element : array(root, "members")) {
       var row = element.getAsJsonObject(); UUID id = uuid(row, "uuid"); members.add(id);
+      roster.add(new Member(player(row,"name"),text(row,"role"),date(row,"joinedAt")));
       if (text(row, "role").equals("OWNER")) {
         if (ownerId != null) throw new IllegalArgumentException("Multiple owners");
         ownerId = id; owner = player(row, "name");
@@ -94,7 +117,9 @@ public final class ExcaliaApiData {
     }
     if (ownerId == null) throw new IllegalArgumentException("Missing owner");
     return new IslandDetail(uuid(root, "islandId"), ownerId, owner, Set.copyOf(members),
-        integer(root, "value", 0, 1_000_000_000_000L));
+        integer(root, "value", 0, 1_000_000_000_000L),List.copyOf(roster),date(root,"createdAt"),
+        root.has("balance")?number(root,"balance"):null,root.has("size")?(int)integer(root,"size",0,100000):0,
+        root.has("generator")?text(root,"generator"):"");
   }
 
   public static Market market(JsonObject root, long receivedAt) {
@@ -115,20 +140,27 @@ public final class ExcaliaApiData {
           ? integer(row, "stock", 0, Long.MAX_VALUE) : 0;
       if (!unlimited && stock == 0) continue;
       String type = itemId(text(row, "type"));
-      var offer = new Offer(text(row, "key"), type, text(row, "name"), player(row, "owner"), price, stock, unlimited);
+      String shop = row.has("shop") && !row.get("shop").isJsonNull() ? row.get("shop").getAsString() : "";
+      if (!shop.matches("[0-9]{1,20}")) shop = "";
+      var offer = new Offer(shop, text(row, "key"), type, text(row, "name"), player(row, "owner"), price, stock, unlimited);
       map.computeIfAbsent(type, k -> new ArrayList<>()).add(offer);
     }
     map.replaceAll((key, value) -> List.copyOf(value)); return Map.copyOf(map);
   }
 
-  private static void quote(List<String> lines, List<Offer> source, String name, int count, boolean buying) {
+  public static List<Offer> best(List<Offer> source, String name, boolean buying) {
     var candidates = source;
     if (source.stream().map(Offer::key).distinct().count() > 1)
       candidates = source.stream().filter(o -> JobXp.normalize(o.name).equals(JobXp.normalize(name))).toList();
-    if (candidates.stream().map(Offer::key).distinct().count() > 1) return;
+    if (candidates.stream().map(Offer::key).distinct().count() > 1) return List.of();
     var order = Comparator.comparing(Offer::price);
     if (buying) order = order.reversed();
-    var best = candidates.stream().min(order.thenComparing(Offer::owner)).orElse(null);
+    return candidates.stream().filter(o -> o.unlimited || o.stock > 0)
+        .sorted(order.thenComparing(Offer::owner).thenComparing(Offer::shop)).limit(5).toList();
+  }
+
+  public static void quote(List<String> lines, List<Offer> candidates, int count, boolean buying) {
+    var best = candidates.isEmpty() ? null : candidates.getFirst();
     if (best == null) return;
     String line = (buying ? "Market sell: " : "Market buy: ") + Numbers.decimal(best.price, 0, 4)
         + " $ / item · " + best.owner;

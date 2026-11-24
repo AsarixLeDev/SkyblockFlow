@@ -1,0 +1,4 @@
+Type: Improvement
+Author: Asarix
+Summary: Compare shop stock and prices in compact cards.
+Details: The Economy view groups shop information and shows available balance standings.

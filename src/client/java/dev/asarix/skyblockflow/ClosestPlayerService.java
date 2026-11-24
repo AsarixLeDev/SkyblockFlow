@@ -107,21 +107,32 @@ public final class ClosestPlayerService {
 
   public RankHistory.Player neighbor(String job) { return history.neighbor(job, Minecraft.getInstance().getUser().getName()); }
   /** Called only by the player's stats command or Refresh button. */
-  public void requestPersonalStats() {
-    if (app.excaliaApi != null && app.excaliaApi.personalStats()) return;
-    var mc = Minecraft.getInstance();
-    if (mc.player == null || busy()) return;
-    quietPersonal = true;
-    passiveTarget = mc.getUser().getName(); passiveJob = ""; passiveHeader = false;
-    passiveUntil = now() + settings().responseTimeoutMs;
-    send("jobs stats " + mc.getUser().getName());
+  private boolean personalRequested;
+  private String dashboardTarget = "";
+  private final Map<String,Long> lastDashboardLookup = new LinkedHashMap<>();
+  public void requestPersonalStats() { requestStats(Minecraft.getInstance().getUser().getName()); }
+  public void requestStats(String name) {
+    if (!name.matches("[A-Za-z0-9_]{1,16}") || !app.excaliaApi.connected()) return;
+    app.excaliaApi.request(ExcaliaApiClient.Feed.JOBS);
+    app.excaliaApi.request(ExcaliaApiClient.Feed.FISHING);
+    dashboardTarget = name;
+    personalRequested = true;
   }
-
+  private boolean needsStats(String name) {
+    long cutoff = System.currentTimeMillis() - ExcaliaApiClient.MAX_QUOTE_AGE;
+    for (String id : JobXp.NAMES.keySet()) {
+      var api = app.excaliaApi.entry(id,name);
+      if (api != null && Double.isFinite(api.reading().xp())) continue;
+      var cached = history.players.getOrDefault(id,Map.of()).get(name.toLowerCase(Locale.ROOT));
+      if (cached == null || cached.reading() == null || cached.xpAt() < cutoff) return true;
+    }
+    return false;
+  }
   public String nextCommand() {
     if (phase == Phase.PAGE_DELAY) return "jobs top " + job + " " + page;
     if (phase == Phase.STATS_DELAY) return "jobs stats " + target;
     if (phase == Phase.IDLE && !pending.isEmpty()) return "jobs top " + pending.peekFirst() + " 1";
-    if (!busy() && islands.needsOwner()) return "is info";
+
     return "";
   }
 
@@ -171,7 +182,7 @@ public final class ClosestPlayerService {
   public void reset() {
     if (app.excaliaApi != null) app.excaliaApi.cancel();
     flushHistory();
-    statsReplies.reset();
+    statsReplies.reset(); lastDashboardLookup.clear(); dashboardTarget = ""; personalRequested = false;
     phase = Phase.IDLE;
     results.clear();
     outcomes.clear();
@@ -304,14 +315,9 @@ public final class ClosestPlayerService {
       status = "Join a world and enable Leaderboards";
       return;
     }
-    if (!apiFallback && app.excaliaApi != null && app.excaliaApi.measure(jobs, missing -> {
-      apiFallback = true;
-      try { start(missing); } finally { apiFallback = false; }
-    })) return;
-    total = jobs.size();
-    completed = 0;
-    pending.addAll(jobs);
-    beginNext();
+    if (app.excaliaApi != null && app.excaliaApi.measure(jobs)) {
+      return;
+    } else status = "Enable public rankings on Excalia to measure";
   }
 
   private void beginNext() {
@@ -458,6 +464,19 @@ public final class ClosestPlayerService {
       connect();
       return;
     }
+    if (personalRequested && !(mc.gui.screen() instanceof dev.asarix.skyblockflow.ui.PlayerViewScreen p && p.jobsFor(dashboardTarget))) personalRequested=false;
+    if (personalRequested && app.excaliaApi.jobFeedsReady() && !busy()
+        && mc.gui.screen() instanceof dev.asarix.skyblockflow.ui.PlayerViewScreen p && p.jobsFor(dashboardTarget)) {
+      String key = dashboardTarget.toLowerCase(Locale.ROOT);
+      if (!needsStats(dashboardTarget) || now() < lastDashboardLookup.getOrDefault(key,0L)) personalRequested = false;
+      else if (now() >= quietUntil && now() - lastCommand >= settings().commandGapMs) {
+        send("jobs stats " + dashboardTarget);
+        personalRequested = false; quietPersonal = true; passiveTarget = dashboardTarget; passiveJob = "";
+        passiveHeader = false; passiveUntil = now() + settings().responseTimeoutMs;
+        lastDashboardLookup.entrySet().removeIf(e -> e.getValue() <= now());
+        lastDashboardLookup.put(key,now() + settings().responseTimeoutMs);
+      }
+    }
     if (!app.store.config.enabled(Feature.LEADERBOARDS)) {
       if (busy()) cancel("Leaderboards disabled");
       hiddenBoard = "";
@@ -465,9 +484,7 @@ public final class ClosestPlayerService {
       return;
     }
     islands.tick(mc, System.currentTimeMillis(), app.inventoryRevision);
-    if (!busy()) {
-      observePassiveBoard();
-    }
+
     if (mc.gui.screen() != null && !(mc.gui.screen() instanceof dev.asarix.skyblockflow.ui.FlowScreen)
         || app.celebrations.active()) {
       if (busy()) cancel("Measurement cancelled by a screen or scene change");
@@ -583,13 +600,13 @@ public final class ClosestPlayerService {
   }
 
   private boolean captureObserved(Component text) {
-    if ((!app.store.config.enabled(Feature.LEADERBOARDS) && !app.store.config.enabled(Feature.JOBS))
+    if ((!app.store.config.enabled(Feature.LEADERBOARDS) && !app.store.config.enabled(Feature.JOBS) && !quietPersonal)
         || Minecraft.getInstance().level != level)
       return false;
     var mc = Minecraft.getInstance();
     if (mc.player == null) return false;
     if (app.store.config.enabled(Feature.LEADERBOARDS)) islands.capture(text.getString(), System.currentTimeMillis());
-    if (!busy()) return passiveStats(text.getString());
+    if (!commandMeasurementActive()) return passiveStats(text.getString());
     if (!busy()
         || (mc.gui.screen() != null
             && !(mc.gui.screen() instanceof dev.asarix.skyblockflow.ui.FlowScreen))
@@ -681,6 +698,7 @@ public final class ClosestPlayerService {
       if (passiveHeader && reading != null) {
         history.cacheStats(passiveTarget, reading, System.currentTimeMillis());
         if (passiveTarget.equalsIgnoreCase(Minecraft.getInstance().getUser().getName())) app.jobs.personalStats(reading);
+        lastDashboardLookup.put(passiveTarget.toLowerCase(Locale.ROOT),now()+ExcaliaApiClient.MAX_QUOTE_AGE);
         changed = any = true;
       } else if (passiveHeader && (plain.isEmpty() || plain.matches("[─━═_\\-= ]+"))) {
         any = true;

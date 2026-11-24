@@ -1,0 +1,17 @@
+# Developer release workflow
+
+Obtain the developer's explicit version, tested flag (yes or no), and mode (dev, beta or public) for every push. Never infer a value, reuse a previous declaration as permission for new work, or accept a request to skip a field. Ask for every missing field and stop before building, pushing or publishing. Record the developer's declaration in the commit trailers Flow-Version, Flow-Tested and Flow-Mode and supply matching FLOW_VERSION, FLOW_TESTED and FLOW_MODE when invoking Gradle. Tests run by an agent do not change a developer declaration.
+
+| Mode | Version | Destination |
+| --- | --- | --- |
+| dev | x.x.n | Development work. No GitHub release. |
+| beta | x.x.n | Tested revision. Publish a GitHub prerelease tagged SkyblockFlow-x.x.n-beta. Start n at 1 and increment once per published beta for the series. |
+| public | x.x | Tested revision. Publish a release tagged SkyblockFlow-PUBLIC-x.x. |
+
+Use a feature branch whenever any modification is untested. A complete declaration with tested=no permits a branch test build and branch push only. Main requires tested=yes, evidence covering all changes and the developer's confirmation for the exact code being promoted. A beta or public tag requires the tested revision on main. Never publish dev or untested builds. Install the version-controlled pre-push hook with `git config core.hooksPath .githooks`. Configure main branch protection to require the validate status check from Release policy before merging. A local hook cannot enforce repository permissions.
+
+Store one UTF-8 text record per change in release/changes/<stable-id>.txt. Use the fields Type, Author, Summary, Details in order. Types are Feature, Fix, Improvement, Performance, Refactor. Write a short standalone summary and an optional detail, continuing a long detail on indented lines. Keep published records immutable. Credit the developer for every entry. Dev changes enter the ledger even though dev never publishes a release.
+
+Release titles are SkyblockFlow followed by a space, the version and either Beta or Public. Release bodies contain the matching Markdown H1 and one bullet per change in the form `- [Type] Summary (DeveloperName)`. Attach the installable Fabric JAR, SHA256SUMS and CHANGE_DETAILS.txt. The details file starts with `Format: 1`, followed by a blank line and records introduced by their [stable-id]. Never manually maintain independent versions of the body and details. Generate and validate both from the ledger. A public release includes every dev and beta change since the previous public release exactly once. A beta includes all changes since its previous beta or public baseline.
+
+The release job verifies tag, developer declaration, mod metadata and the change records before publication. Never replace an existing public asset with different bytes under the same version.

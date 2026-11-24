@@ -1,0 +1,4 @@
+Type: Fix
+Author: Asarix
+Summary: Keep the player profile open during background inspection.
+Details: The first inspection fills the dashboard without interrupting it. Refresh can be used again after completion.

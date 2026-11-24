@@ -1,0 +1,4 @@
+Type: Feature
+Author: Asarix
+Summary: Browse chat by category, including private conversations.
+Details: Switching tabs keeps message history and compression. Private replies appear with the conversation.

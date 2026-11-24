@@ -1,0 +1,4 @@
+Type: Fix
+Author: Asarix
+Summary: Recognize more job XP, skill-ready and mineral events.
+Details: Includes fishing XP and stylized job icons, with per-alert choices for playable sounds.

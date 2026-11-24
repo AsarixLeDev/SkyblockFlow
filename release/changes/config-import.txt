@@ -1,0 +1,4 @@
+Type: Feature
+Author: Asarix
+Summary: Import an existing ExcaliaFlow configuration.
+Details: A local import prompt carries compatible preferences into the SkyblockFlow configuration.

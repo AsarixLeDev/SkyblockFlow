@@ -1,0 +1,4 @@
+Type: Feature
+Author: Asarix
+Summary: Use Excalia snapshots for rankings, shop quotes and server prices.
+Details: Cached public data supplements in-game observations and respects API rate limits.

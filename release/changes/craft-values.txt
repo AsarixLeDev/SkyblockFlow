@@ -1,0 +1,4 @@
+Type: Performance
+Author: Asarix
+Summary: Reuse crafting prices while inspecting recipe costs.
+Details: Keep costly recipe valuation off the tooltip rendering path.

@@ -1,6 +1,5 @@
 package dev.asarix.skyblockflow.core;
 
-import java.text.Normalizer;
 import java.util.*;
 
 /** Server-independent ingredients, recipe indexes and inventory-aware material planning. */
@@ -160,7 +159,6 @@ public final class RecipeCatalog {
   }
 
   public static String searchKey(String text) {
-    return Normalizer.normalize(text.toLowerCase(Locale.ROOT), Normalizer.Form.NFD)
-        .replaceAll("\\p{M}+", "").replace('_', ' ').strip();
+    return JobXp.normalize(text).replace('_', ' ').replaceAll("\\p{Cf}", "").strip();
   }
 }
