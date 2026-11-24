@@ -1,0 +1,4 @@
+Type: Feature
+Author: Asarix
+Summary: Preview and install SkyblockFlow updates from the title screen.
+Details: Read color-coded patch notes, inspect individual changes and choose whether to receive beta suggestions. Downloads require confirmation and activate after a restart.

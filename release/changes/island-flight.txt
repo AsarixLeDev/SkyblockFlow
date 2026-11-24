@@ -1,0 +1,4 @@
+Type: Fix
+Author: Asarix
+Summary: Enable flight after any teleport into your island.
+Details: Remember the island dimension and border. A teleport inside the same island also checks whether /fly enable is needed.

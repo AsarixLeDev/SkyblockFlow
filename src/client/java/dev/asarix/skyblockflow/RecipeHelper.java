@@ -47,6 +47,9 @@ public final class RecipeHelper {
   private final SkyblockFlowClient app;
   private final Minecraft mc = Minecraft.getInstance();
   private final RecipePlacement placement = new RecipePlacement(this);
+  private final RecipePricing pricing;
+  private final VanillaPlacement vanillaPlacement = new VanillaPlacement(this);
+  private final Map<String, Recipe> observedRecipes = new LinkedHashMap<>();
   private final SeasonThreeCatalog.Data season = SeasonThreeCatalog.load();
   private final EnumMap<Action, KeyMapping> keys = new EnumMap<>(Action.class);
   private final Map<String, ItemStack> icons = new HashMap<>();
@@ -81,6 +84,7 @@ public final class RecipeHelper {
       if (!item.model().isEmpty()) modelIds.put(item.model(), key);
     });
     var category = KeyMapping.Category.register(Identifier.fromNamespaceAndPath("skyblockflow", "recipes"));
+    pricing = new RecipePricing(app, this, category);
     for (var action : Action.values()) keys.put(action, KeyMappingHelper.registerKeyMapping(
         new KeyMapping("key.skyblockflow.recipe." + action.name().toLowerCase(Locale.ROOT),
             action.defaultKey, category)));
@@ -96,8 +100,10 @@ public final class RecipeHelper {
           itemIndex = List.of();
           catalog = new RecipeCatalog(List.of());
           placement.reset();
+          vanillaPlacement.reset();
+          observedRecipes.clear();
         });
-    ClientTickEvents.END_CLIENT_TICK.register(client -> placement.tick());
+    ClientTickEvents.END_CLIENT_TICK.register(client -> { placement.tick(); vanillaPlacement.tick(); });
     ClientCommandRegistrationCallback.EVENT.register((dispatcher, registries) ->
         dispatcher.register(LiteralArgumentBuilder.<FabricClientCommandSource>literal("skyblockflowrecipes").executes(context -> {
           mc.schedule(() -> open(mc.gui.screen(), null, false, false));
@@ -132,7 +138,7 @@ public final class RecipeHelper {
         || screen instanceof AbstractContainerScreen<?> && !settings().inventoryDockHidden);
   }
 
-  public enum CraftButton { CRAFT, OPEN, LOADING, RETRY, APPLYING, BOOK, GUIDE }
+  public enum CraftButton { CRAFT, OPEN, LOADING, RETRY, APPLYING, GUIDE }
 
   public void prepareCraft(RecipeScreen viewer, Recipe recipe, Screen parent) {
     placement.begin(viewer, recipe, parent);
@@ -209,6 +215,7 @@ public final class RecipeHelper {
         ids.add(recipe.output());
         for (Ingredient input : recipe.ingredients()) ids.addAll(input.choices());
       }
+      ids.addAll(season.items().keySet());
       BuiltInRegistries.ITEM.keySet().stream().sorted().forEach(key -> {
         if (BuiltInRegistries.ITEM.getValue(key) != Items.AIR) ids.add(key.toString());
       });
@@ -241,6 +248,7 @@ public final class RecipeHelper {
     seasonActive = excalia;
     var entries = new ArrayList<Recipe>();
     // Season data remains browsable offline. Live prices and custom actions are scoped to Excalia.
+    entries.addAll(observedRecipes.values());
     entries.addAll(season.recipes());
     serverRecipes.clear();
     if (mc.level != null && mc.player != null) {
@@ -248,6 +256,7 @@ public final class RecipeHelper {
       for (var group : mc.player.getRecipeBook().getCollections())
         for (var entry : group.getRecipes()) addServerRecipe(entry, context, entries);
     }
+    entries.addAll(VanillaRecipeCatalog.load());
     catalog = new RecipeCatalog(entries);
     previousRecipe = null;
     return catalog;
@@ -308,7 +317,31 @@ public final class RecipeHelper {
     if (icons.size() < 4096) icons.putIfAbsent(output, result.copyWithCount(1));
   }
 
-  public RecipeDisplayId serverId(Recipe recipe) { return serverRecipes.get(recipe.id()); }
+  public RecipeDisplayId serverId(Recipe recipe) {
+    if (recipe == null) return null;
+    var direct = serverRecipes.get(recipe.id());
+    if (direct != null) return direct;
+    return catalog().produces(recipe.output()).stream()
+        .filter(r -> r.station() == recipe.station() && r.amount() == recipe.amount()
+            && r.ingredients().size() == recipe.ingredients().size()
+            && new HashSet<>(r.ingredients()).equals(new HashSet<>(recipe.ingredients())))
+        .map(r -> serverRecipes.get(r.id())).filter(Objects::nonNull).findFirst().orElse(null);
+  }
+
+  Recipe learnGrid(Recipe known, String output, List<Cell> cells, int count) {
+    if (cells.isEmpty() || known != null && known.hasGrid()) return known;
+    var totals = new LinkedHashMap<List<String>,Integer>();
+    for (var cell : cells) totals.merge(cell.ingredient().choices(),cell.ingredient().amount(),Integer::sum);
+    var ingredients = totals.entrySet().stream().map(e -> new Ingredient(e.getKey(),e.getValue())).toList();
+    if (known != null && (!new HashSet<>(known.ingredients()).equals(new HashSet<>(ingredients)) || count != known.amount())) return known;
+    Station station = known == null ? Station.CUSTOM : known.station();
+    if (station == Station.VANILLA && cells.stream().anyMatch(c -> c.x()>=3 || c.y()>=3)) return known;
+    var learned = new Recipe(known == null ? "observed:"+output : known.id(),output,count,station,
+        station == Station.VANILLA ? 3 : 6,ingredients,cells,"",true);
+    if (observedRecipes.size() >= 256) observedRecipes.remove(observedRecipes.keySet().iterator().next());
+    observedRecipes.put(learned.id(),learned); recipeCollections = null;
+    return learned;
+  }
 
   public String key(ItemStack stack) {
     if (stack.isEmpty()) return "";
@@ -412,7 +445,8 @@ public final class RecipeHelper {
 
   public String name(String id) {
     var known = season.items().get(id);
-    if (known != null && !known.name().isBlank()) return known.name();
+    if (known != null && !known.name().isBlank()
+        && !(id.startsWith("minecraft:") && known.name().equals(id.substring(10)))) return known.name();
     var seen = icons.get(id);
     if (seen != null) return seen.getHoverName().getString();
     if (id.startsWith("minecraft:")) {
@@ -468,7 +502,8 @@ public final class RecipeHelper {
   }
 
   public boolean canCraft(Recipe recipe) {
-    return recipe.station() == Station.CUSTOM || recipe.station() == Station.VANILLA && recipe.hasGrid();
+    return recipe != null && (recipe.station() == Station.CUSTOM
+        || recipe.station() == Station.VANILLA && (recipe.hasGrid() || usesExcaliaBook(recipe)));
   }
 
   public boolean usesExcaliaBook(Recipe recipe) {
@@ -476,7 +511,7 @@ public final class RecipeHelper {
   }
 
   public boolean canPlace(Recipe recipe, Screen parent) {
-    return recipe.station() == Station.VANILLA && serverId(recipe) != null
+    return recipe != null && recipe.station() == Station.VANILLA && recipe.hasGrid()
         && mc.player != null && mc.gameMode != null
         && parent instanceof AbstractContainerScreen<?> table
         && table.getMenu() instanceof CraftingMenu && table.getMenu() == mc.player.containerMenu
@@ -489,8 +524,10 @@ public final class RecipeHelper {
     var recipeId = serverId(recipe);
     if (mc.gui.screen() != parent) mc.gui.setScreen(parent);
     if (mc.player.containerMenu == menu) {
-      mc.gameMode.handlePlaceRecipe(menu.containerId, recipeId, max);
-      message("Recipe placement requested");
+      if (recipeId != null) {
+        mc.gameMode.handlePlaceRecipe(menu.containerId, recipeId, max);
+        message("Recipe placement requested");
+      } else vanillaPlacement.start(recipe, (AbstractContainerScreen<?>)parent, max);
     }
   }
 
@@ -504,7 +541,7 @@ public final class RecipeHelper {
       var viewer = new RecipeScreen(this, parent, recipe.output(), false, false, recipe);
       mc.gui.setScreen(viewer);
       if (craftButton(viewer, recipe, parent) == CraftButton.GUIDE) viewer.showCraftGuide(recipe);
-      else prepareCraft(viewer, recipe, parent);
+      else pressCraft(viewer, recipe, parent, max);
     }
   }
 
@@ -627,16 +664,14 @@ public final class RecipeHelper {
     var usage = c.uses(id);
     var recipe = recipeFor(id);
     var data = season.items().get(id);
-    var prices = browsing ? shopReference(id) : shopLines(stack, onExcalia());
     String description = data == null ? "" : data.description();
-    if (recipe == null && usage.isEmpty() && prices.isEmpty() && description.isEmpty()) return;
+    if (recipe == null && usage.isEmpty() && description.isEmpty()) return;
     int screenW = g.guiWidth(), screenH = g.guiHeight();
     int w = Math.min(136, screenW / 3 + 5);
     if (w < 65) return;
     int iconsPerRow = Math.max(1, (w - 16) / 19);
     int recipeHeight = recipe == null ? 0 : recipe.hasGrid() ? recipe.size() * 15 + 15 : 25;
-    int shownPrices = Math.min(2, prices.size());
-    int h = 30 + 12 * shownPrices + (description.isEmpty() ? 0 : 12)
+    int h = 30 + (description.isEmpty() ? 0 : 12)
         + (usage.isEmpty() ? 0 : 30) + recipeHeight;
     int x = mouseX < screenW / 2 ? screenW - w - 5 : 5;
     int y = Math.max(5, Math.min(mouseY - 11, screenH - h - 5));
@@ -647,8 +682,6 @@ public final class RecipeHelper {
       Ui.text(g, Ui.trim(description, w - 14), x + 7, line, FlowScreen.TEXT);
       line += 12;
     }
-    for (int i = 0; i < shownPrices; i++, line += 12)
-      Ui.text(g, Ui.trim(prices.get(i), w - 14), x + 7, line, FlowScreen.GOLD);
     if (!usage.isEmpty()) {
       Ui.text(g, Ui.trim("Used for · " + keyName(Action.USES), w - 14), x + 7, line, FlowScreen.TEXT);
       line += 11;
@@ -681,7 +714,6 @@ public final class RecipeHelper {
   public List<String> shopLines(ItemStack stack, boolean allowReference) {
     if (stack.isEmpty()) return List.of();
     var prices = new ArrayList<String>();
-    var data = season.items().get(key(stack));
     if (onExcalia() && mc.gui.screen() instanceof AbstractContainerScreen<?> screen) {
       String title = JobXp.normalize(screen.getTitle().getString());
       String shop = ShopPrices.shop(title);
@@ -693,15 +725,7 @@ public final class RecipeHelper {
           prices.add(ShopPrices.line("Shop", quote.buy(), quote.sell(), quote.unit(), stack.getCount()));
       }
     }
-    var publicPrices = app.excaliaApi == null ? List.<SeasonThreeCatalog.ShopQuote>of() : app.excaliaApi.prices(key(stack));
-    var referencePrices = !publicPrices.isEmpty() ? publicPrices : data == null ? List.<SeasonThreeCatalog.ShopQuote>of() : data.prices();
-    if (prices.isEmpty() && allowReference)
-      for (var quote : referencePrices) {
-        var level = app.jobs.tracker.data.jobs.get(quote.shop());
-        var sell = quote.sell();
-        if (sell != null && level != null && onExcalia()) sell = ShopValue.unit(sell, level.level);
-        prices.add(ShopPrices.line(!publicPrices.isEmpty() ? app.excaliaApi.priceSource(quote.shop()) : "S3 " + quote.shop(), quote.buy(), sell, quote.unit(), stack.getCount()));
-      }
+    if (prices.isEmpty() && allowReference) prices.addAll(referencePrices(key(stack), stack.getCount()));
     if (app.excaliaApi != null && !stack.isEnchanted() && !stack.isDamaged()
         && stack.get(DataComponents.POTION_CONTENTS) == null)
       prices.addAll(app.excaliaApi.market(key(stack), stack.getHoverName().getString(), stack.getCount()));
@@ -709,10 +733,85 @@ public final class RecipeHelper {
   }
 
   public List<String> shopReference(String id) {
+    if (!app.store.config.tools.shopValues) return List.of();
+    var lines = new ArrayList<>(referencePrices(id, 1));
+    if (app.excaliaApi != null) lines.addAll(app.excaliaApi.market(id, name(id), 1));
+    return lines;
+  }
+
+  public record PurchaseSource(String source, String price, String destination, String stock) {}
+
+  public List<PurchaseSource> purchaseSources(String id) {
+    if (id == null || !app.store.config.tools.shopValues) return List.of();
     var data = season.items().get(id);
     var live = app.excaliaApi == null ? List.<SeasonThreeCatalog.ShopQuote>of() : app.excaliaApi.prices(id);
     var prices = !live.isEmpty() ? live : data == null ? List.<SeasonThreeCatalog.ShopQuote>of() : data.prices();
-    return prices.stream().map(quote ->
-        ShopPrices.line(!live.isEmpty() ? app.excaliaApi.priceSource(quote.shop()) : "S3 " + quote.shop(), quote.buy(), quote.sell(), quote.unit(), 1)).toList();
+    var sources = new ArrayList<PurchaseSource>();
+    for (var quote : prices) {
+      if (quote.buy() == null || quote.buy().signum() < 0) continue;
+      String shop = switch (quote.shop()) {
+        case "mineur" -> "Mineur"; case "bucheron" -> "Bûcheron"; case "fermier" -> "Fermier";
+        case "chasseur" -> "Chasseur"; case "aventurier" -> "Aventurier"; case "pecheur" -> "Pêcheur";
+        case "blocs" -> "Blocs"; case "spawners" -> "Spawners"; case "vote" -> "Vote";
+        case "boutique" -> "Boutique"; default -> quote.shop();
+      };
+      String unit = quote.unit().equalsIgnoreCase("Skydollars") ? "$" : quote.unit();
+      String destination = switch (quote.shop()) {
+        case "vote" -> "/vote"; case "boutique" -> "/boutique";
+        case "pecheur" -> "Marchand de pêche"; default -> "/shop → " + shop;
+      };
+      sources.add(new PurchaseSource("Shop " + shop, Numbers.decimal(quote.buy(), 0, 4) + " " + unit + " / item",
+          destination, "Server shop"));
+    }
+    if (app.excaliaApi != null) for (var offer : app.excaliaApi.sellers(id, name(id)))
+      sources.add(new PurchaseSource("Shop · " + offer.owner(), Numbers.decimal(offer.price(), 0, 4) + " $ / item",
+          "Player shop", offer.unlimited() ? "Unlimited stock" : Numbers.integer(offer.stock()) + " in stock"));
+    return List.copyOf(sources);
+  }
+
+  private List<String> referencePrices(String id, int count) {
+    var data = season.items().get(id);
+    var live = app.excaliaApi == null ? List.<SeasonThreeCatalog.ShopQuote>of() : app.excaliaApi.prices(id);
+    var prices = !live.isEmpty() ? live : data == null ? List.<SeasonThreeCatalog.ShopQuote>of() : data.prices();
+    var lines = new ArrayList<String>();
+    for (var quote : prices) {
+      var sell = quote.sell();
+      var level = app.jobs.tracker.data.jobs.get(quote.shop());
+      if (sell != null && level != null && onExcalia()) sell = ShopValue.unit(sell, level.level);
+      lines.add(ShopPrices.line(!live.isEmpty() ? app.excaliaApi.priceSource(quote.shop()) : "S3 " + quote.shop(),
+          quote.buy(), sell, quote.unit(), count));
+    }
+    return lines;
+  }
+
+  public List<Component> browserTooltip(String id, boolean controls) {
+    var lines = new ArrayList<Component>();
+    // A catalog icon can be a stand-in (for example glass for a solar cell).
+    // Never use that stand-in's vanilla lore or prices as the item's description.
+    if (id.startsWith("minecraft:")) {
+      var location = Identifier.tryParse(id);
+      if (location != null) lines.addAll(Screen.getTooltipFromItem(mc, BuiltInRegistries.ITEM.getValue(location).getDefaultInstance()));
+    } else if (icons.containsKey(id)) {
+      lines.addAll(Screen.getTooltipFromItem(mc, icons.get(id)));
+    }
+    if (lines.isEmpty()) lines.add(Ui.label(name(id)));
+    var existing = new HashSet<String>();
+    lines.forEach(line -> existing.add(line.getString()));
+    var data = season.items().get(id);
+    if (data != null && !data.description().isBlank() && existing.add(data.description()))
+      lines.add(dev.asarix.skyblockflow.ui.DisplayText.literal(data.description()).withColor(FlowScreen.MUTED));
+    for (String price : shopReference(id))
+      if (existing.add(price)) lines.add(dev.asarix.skyblockflow.ui.DisplayText.literal(price).withColor(FlowScreen.GOLD));
+    pricing.append(id, 1, lines);
+    if (controls) lines.add(Ui.label("Click for recipe · Right-click for uses").copy().withColor(FlowScreen.MUTED));
+    return lines;
+  }
+
+  public void craftingValue(ItemStack stack, List<Component> lines) { pricing.append(key(stack), stack.getCount(), lines); }
+
+  public void browserTooltip(GuiGraphicsExtractor g, String id, int x, int y, boolean controls) {
+    var actual = icons.get(id);
+    var image = actual == null ? Optional.<net.minecraft.world.inventory.tooltip.TooltipComponent>empty() : actual.getTooltipImage();
+    g.setTooltipForNextFrame(mc.font, browserTooltip(id, controls), image, x, y, RecipeScreen.TOOLTIP_STYLE);
   }
 }

@@ -12,10 +12,10 @@ public final class PublicDataScreen extends FormScreen {
   }
   protected String description() { return "Excalia Season 3 · rankings and prices from excalia.fr"; }
   protected void buildForm() {
-    toggle("Public job & island rankings", draft.leaderboards, 0, () -> draft.leaderboards = !draft.leaderboards);
+    toggle("Public jobs, island & balance ranks", draft.leaderboards, 0, () -> draft.leaderboards = !draft.leaderboards);
     toggle("Player-shop buy & sell quotes", draft.market, 36, () -> draft.market = !draft.market);
     toggle("Current server-shop prices", draft.shopPrices, 72, () -> draft.shopPrices = !draft.shopPrices);
-    label("Rankings cover published tops. Other players use the usual lookup.", 0, 112);
+    label("Published tops define ranks. A stats lookup fills missing job XP.", 0, 112);
     label("Market buy: cheapest seller. Market sell: highest buyer.", 0, 134);
     label("Quotes show the merchant; availability may change before you arrive.", 0, 156);
     label("Unit and stack totals respect listed stock. Sold-out offers are hidden.", 0, 178);

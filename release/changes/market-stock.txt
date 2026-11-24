@@ -1,0 +1,4 @@
+Type: Improvement
+Author: Asarix
+Summary: Track observed market signs and stock changes.
+Details: Market observations supplement shop information when it is available.

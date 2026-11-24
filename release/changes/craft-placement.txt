@@ -1,0 +1,4 @@
+Type: Improvement
+Author: Asarix
+Summary: Use the crafting grid when placing recipe ingredients.
+Details: Crafting placement and vanilla recipe discovery account for materials already present.

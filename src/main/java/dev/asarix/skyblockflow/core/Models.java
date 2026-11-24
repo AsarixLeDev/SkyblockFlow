@@ -41,7 +41,8 @@ public final class Models {
     ENERGY,
     ESPORTS,
     ALARMS,
-    COMMUNITY_NAMES
+    COMMUNITY_NAMES,
+    ISLAND_FLIGHT
   }
 
   public static class FeatureOptions {
@@ -55,6 +56,7 @@ public final class Models {
     PETS("Hungry pet", Feature.PETS),
     TIMER("Timers", Feature.TIMERS),
     DAILY_CLAIMS("Daily claims", Feature.ALARMS),
+    ISLAND_FLIGHT("Island flight setup", Feature.ISLAND_FLIGHT),
     RANK("Leaderboard rank change", Feature.LEADERBOARDS),
     LEVEL_UP("Level up", Feature.JOBS),
     ANCIENT_DEBRIS("Ancient debris", Feature.ALARMS),
@@ -173,6 +175,7 @@ public final class Models {
   }
 
   public static class Config {
+    public boolean darkPlayerProfiles;
     public int version = 2;
     public int defaultAlertsVersion;
     public long connectionGraceMs = 60000;

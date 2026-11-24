@@ -28,5 +28,6 @@
   "skyblockflow.migration.source_disconnect_continue": "Se déconnecter et vérifier l’importation",
   "skyblockflow.migration.source_folder": "Ancien dossier ou fichier de configuration",
   "skyblockflow.migration.source_continue": "Vérifier l’importation",
-  "skyblockflow.migration.source_missing": "Choisissez un dossier excaliaflow qui contient le fichier excaliaflow.json."
+  "skyblockflow.migration.source_missing": "Choisissez un dossier excaliaflow qui contient le fichier excaliaflow.json.",
+  "key.skyblockflow.recipe.cost_details": "Maintenir pour détailler les ingrédients"
 }

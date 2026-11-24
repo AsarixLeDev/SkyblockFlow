@@ -34,82 +34,31 @@ public final class LeaderboardsScreen extends FormScreen {
   protected void buildForm() {
     var service = app.closest;
     page("Jobs");
-    int half = (bodyW - 6) / 2;
-    action("Measure all", 0, 0, half, service::measureAll);
-    action("Measure current", half + 6, 0, half, service::measureCurrent);
-    String next = service.nextCommand();
-    if (!next.isEmpty()) action("Run /" + next, 0, 30, bodyW, () -> service.executeNext(next));
-    action("Public data settings", 0, 64, half,
-        () -> minecraft.gui.setScreen(new PublicDataScreen(app, this)));
-    action("Cancel measurement", half + 6, 64, half, service::cancel);
-    label(service.status, 0, 98);
-    label(service.progress(), 0, 118);
-    action(
-        "Measurement settings",
-        0,
-        148,
-        bodyW,
-        () -> minecraft.gui.setScreen(new ClosestSettingsScreen(app, this, service.settings())));
-    int y = 184;
+    int half = (bodyW-6)/2;
+    action("Refresh rankings",0,0,half,service::measureAll);
+    action("Public data settings",half+6,0,half,()->minecraft.gui.setScreen(new PublicDataScreen(app,this)));
+    label(service.status,0,34);
+    int y=62;
     for (var id : JobXp.NAMES.keySet()) {
-      var rank = service.history.boards.get(id);
-      action(
-          JobXp.name(id)
-              + " · "
-              + (rank == null
-                  ? "Unmeasured"
-                  : "#" + rank.position() + " · " + TIME.format(Instant.ofEpochMilli(rank.at()))),
-          0,
-          y,
-          bodyW,
-          () -> service.measure(id));
+      String rank=app.excaliaApi.rank(id,minecraft.getUser().getName());
+      action(JobXp.name(id)+"  ·  "+rank,0,y,bodyW,()->service.measure(id));
       String detail = service.lead(id);
       label(detail.isEmpty() ? service.outcome(id) : "Lead over #2 · " + detail, 0, y + 25);
       y += 50;
     }
-    page("Island power");
-    var island = service.islands;
-    label(
-        "Public rankings when available; browse /is visits for other islands.", 0, 0);
-    label(island.status, 0, 26);
-    var h = service.history;
-    var last = h.boards.get("island/" + h.owner);
-    label(
-        last == null
-            ? "Last confirmed rank unknown"
-            : "Last confirmed · "
-                + h.owner
-                + " #"
-                + last.position()
-                + " · "
-                + TIME.format(Instant.ofEpochMilli(last.at())),
-        0,
-        52);
-    long age = System.currentTimeMillis() - h.snapshotAt;
-    label(
-        h.snapshotAt == 0
-            ? "No snapshot"
-            : "Snapshot · "
-                + TIME.format(Instant.ofEpochMilli(h.snapshotAt))
-                + " · "
-                + h.islands.size()
-                + " entries"
-                + (age > 60000 ? " · stale" : ""),
-        0,
-        76);
-    label("Position · " + island.estimate, 0, 100);
-    action(h.owner.isEmpty() ? "Identify my island" : "I changed of leader", 0, 168, bodyW, island::leaderChanged);
-    action("Browse-page hint: " + (service.settings().islandBrowseHint ? "ON" : "OFF"), 0, 202, bodyW, () -> {
-      service.settings().islandBrowseHint = !service.settings().islandBrowseHint; app.save(); rebuildWidgets();
-    });
-    if (island.needsOwner()) action("Run /is info", 0, 270, bodyW, () -> service.executeNext("is info"));
-    label("Island leader · " + (h.owner.isEmpty() ? "Not found yet" : h.owner), 0, 238);
-    action(
-        "Preview observed item and edit pattern",
-        0,
-        132,
-        bodyW,
-        () -> minecraft.gui.setScreen(new IslandPatternScreen(app, this)));
+    page("Island & balance");
+    var island=service.islands;
+    label("Island power",0,0);
+    label(island.estimate,0,22);
+    action("Refresh public rankings",0,52,bodyW,service::measureAll);
+    var money=app.excaliaApi.snapshot(ExcaliaApiClient.Feed.MONEY);
+    String rank=money==null ? app.excaliaApi.state(ExcaliaApiClient.Feed.MONEY) :
+        money.profiles().forPlayer(minecraft.getUser().getName()).stream()
+        .filter(field->field.label().equals("Rank")).map(ProfileIndex.Field::value).findFirst().orElse("Unranked");
+    label("Skydollars   ·   "+rank,0,90);
+    action("View player profile",0,120,bodyW,()->minecraft.gui.setScreen(
+        new PlayerViewScreen(app,this,minecraft.getUser().getName())));
+
   }
 }
 

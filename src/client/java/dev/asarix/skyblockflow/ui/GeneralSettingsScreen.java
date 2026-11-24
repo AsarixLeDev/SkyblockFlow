@@ -32,6 +32,7 @@ public final class GeneralSettingsScreen extends FormScreen {
         0);
     label("Alerts during the connection grace period are discarded.", 0, 46);
     keyField("Open feature browser", browserKey, 72, k -> browserKey = k);
+    action("Mod updates", 0, 144, bodyW, () -> dev.asarix.flow.update.Updates.open(this));
     page("Profiles");
     toggle("Separate settings for each server/world", profiles, 0, () -> profiles = !profiles);
     label("Current profile: " + app.store.config.profileName, 0, 36);

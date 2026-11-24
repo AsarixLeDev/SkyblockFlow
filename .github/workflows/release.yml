@@ -1,44 +1,49 @@
-name: Release
-on:
-  push:
-    tags: ['PUBLIC-*']
+name: Release policy
+on: [push, pull_request]
 permissions:
   contents: read
 jobs:
-  release:
+  validate:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
+        with:
+          fetch-depth: 0
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - name: Validate developer declaration
+        env:
+          TARGET: ${{ github.event_name == 'pull_request' && format('refs/heads/{0}', github.base_ref) || github.ref }}
+        run: python3 tools/release.py --ref "$TARGET"
+  publish:
+    needs: validate
+    if: startsWith(github.ref, 'refs/tags/SkyblockFlow-')
+    runs-on: ubuntu-latest
     permissions:
       contents: write
     steps:
-      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
         with:
+          fetch-depth: 0
           persist-credentials: false
-      - uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961 # v5
+      - uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961
         with:
           distribution: temurin
           java-version: '25'
-      - name: Verify release version
-        shell: bash
-        run: |
-          version=$(sed -n 's/^mod_version=//p' gradle.properties)
-          test "$version" = "$GITHUB_REF_NAME"
-      - name: Build public release
-        run: ./gradlew --no-daemon publicRelease
-      - name: Create checksums
-        working-directory: build/libs
-        run: sha256sum *.jar > SHA256SUMS
-      - name: Publish release files
+      - run: python3 tools/release.py --ref "$GITHUB_REF" --render
+      - run: ./gradlew --no-daemon publicRelease
+      - name: Publish verified assets
         env:
           GH_TOKEN: ${{ github.token }}
         shell: bash
         run: |
-          release_args=()
-          if [[ "$GITHUB_REF_NAME" == PUBLIC-BETA-* ]]; then
-            release_args+=(--prerelease)
-          fi
-          gh release create "$GITHUB_REF_NAME" \
-            "build/libs/skyblockflow-${GITHUB_REF_NAME}.jar" \
-            "build/libs/skyblockflow-${GITHUB_REF_NAME}-sources.jar" \
-            build/libs/SHA256SUMS \
-            --verify-tag --title "$GITHUB_REF_NAME" --notes-file RELEASE_NOTES.md "${release_args[@]}"
+          set -eu
+          jar_version="$FLOW_VERSION"
+          flags=()
+          if [[ "$FLOW_MODE" = beta ]]; then jar_version="$jar_version-beta"; flags+=(--prerelease); fi
+          jar="skyblockflow-$jar_version.jar"
+          cd build/libs
+          (cd ../.. && python3 tools/release.py --ref "$GITHUB_REF" --verify-jar "build/libs/$jar")
+          sha256sum "$jar" > ../release/SHA256SUMS
+          (cd ../release && sha256sum CHANGE_DETAILS.txt >> SHA256SUMS)
+          title=$(sed -n '1s/^# //p' ../release/RELEASE_NOTES.md)
+          gh release create "$GITHUB_REF_NAME" --verify-tag "${flags[@]}" --title "$title" --notes-file ../release/RELEASE_NOTES.md "$jar" ../release/SHA256SUMS ../release/CHANGE_DETAILS.txt

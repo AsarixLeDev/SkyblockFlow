@@ -13,14 +13,26 @@ public abstract class JobCommandMixin {
   private void skyblockflow$jobs(String command, CallbackInfo ci) {
     var app = SkyblockFlowClient.INSTANCE;
     if (app == null || app.closest == null) return;
-    if (!app.closest.internalCommand() && command.strip().matches("(?i)/?jobs?\\s+stats")
-        && app.store.config.enabled(Feature.JOBS) && !app.store.config.jobs.vanillaJobsStats) {
-      app.closest.cancel();
-      app.closest.requestPersonalStats();
+    if (!app.closest.internalCommand() && app.excaliaApi != null && app.excaliaApi.connected()) {
+      var parts = command.strip().replaceFirst("^/","").split("\\s+");
       var mc = Minecraft.getInstance();
-      mc.schedule(() -> mc.gui.setScreen(new JobStatsScreen(app, null)));
-      ci.cancel();
-      return;
+      boolean stats = parts.length >= 2 && parts.length <= 3 && parts[0].matches("(?i)jobs?")
+          && parts[1].equalsIgnoreCase("stats") && app.store.config.enabled(Feature.JOBS)
+          && !app.store.config.jobs.vanillaJobsStats;
+      boolean profile = parts.length <= 2 && parts[0].equalsIgnoreCase("pv");
+      if (stats || profile) {
+        int argument = stats ? 2 : 1;
+        String target = parts.length > argument ? parts[argument] : mc.getUser().getName();
+        if (target.matches("[A-Za-z0-9_]{1,16}")) {
+          mc.schedule(() -> mc.gui.setScreen(stats ? new JobStatsScreen(app,null,target)
+              : new dev.asarix.skyblockflow.ui.PlayerViewScreen(app,null,target)));
+          ci.cancel(); return;
+        }
+      }
+    }
+    if(app.excaliaApi!=null){
+      if(app.excaliaApi.inspections.sendingInspection())return;
+      app.excaliaApi.inspections.commandSent(command);
     }
     app.commandSent(command);
   }

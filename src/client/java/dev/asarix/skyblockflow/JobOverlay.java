@@ -93,7 +93,11 @@ public final class JobOverlay {
             placeholder
                 ? List.of(new Row("Status", "Waiting for job XP"))
                 : rows(job, settings, now));
-    if (!placeholder) rows.addAll(app.closest.rows(job, settings));
+    if (!placeholder) {
+      String rank = app.excaliaApi.rank(job.id,Minecraft.getInstance().getUser().getName());
+      rows.add(new Row("Job rank",rank));
+      if (rank.startsWith("#")) rows.addAll(app.closest.rows(job, settings));
+    }
     var hud = app.store.config.hud;
     var paint =
         new dev.asarix.skyblockflow.ui.HudPaint(

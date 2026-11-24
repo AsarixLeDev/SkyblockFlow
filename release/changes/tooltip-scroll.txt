@@ -1,0 +1,4 @@
+Type: Improvement
+Author: Asarix
+Summary: Read long item tooltips and see sack badges in inventories.
+Details: Scrollable tooltips keep long descriptions accessible.

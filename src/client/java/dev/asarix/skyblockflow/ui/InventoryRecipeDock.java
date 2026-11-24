@@ -528,9 +528,7 @@ public final class InventoryRecipeDock {
       if (hover == null && l.bookmarks != null && state.bookmarksVisible)
         hover = tileAt(l.bookmarks.grid, pins, state.bookmarkPage, mx, my);
       if (hover != null) {
-        g.setComponentTooltipForNextFrame(screen.getFont(),
-            List.of(Ui.label(helper.name(hover.id())), Ui.label("Click for recipe · Right-click for uses")),
-            mx, my, RecipeScreen.TOOLTIP_STYLE);
+        helper.browserTooltip(g, hover.id(), mx, my, true);
         if (helper.inspectInside()) helper.inspectBrowser(g, hover.id(), mx, my);
       }
     }

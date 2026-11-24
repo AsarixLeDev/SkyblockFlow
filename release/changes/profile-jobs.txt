@@ -1,0 +1,4 @@
+Type: Improvement
+Author: Asarix
+Summary: Open job statistics in the Jobs tab of a player profile.
+Details: Compact cards expand into detailed statistics. Named player lookups and known-player completion are supported.

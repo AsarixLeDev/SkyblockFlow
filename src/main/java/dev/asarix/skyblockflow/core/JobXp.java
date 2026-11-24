@@ -191,6 +191,32 @@ public final class JobXp {
     };
   }
 
+  // Prefix sums share the same level boundaries as the tracker and its ETA calculation.
+  private static final class Curves {
+    static final java.util.concurrent.CompletableFuture<Map<String,long[]>> TOTALS =
+        java.util.concurrent.CompletableFuture.supplyAsync(Curves::build);
+    static Map<String,long[]> build() {
+      var result = new HashMap<String,long[]>();
+      for (var id : NAMES.keySet()) {
+        var values = new long[201];
+        for (int i=0; i<200; i++) values[i+1] = values[i] + requirement(id,i);
+        result.put(id,values);
+      }
+      return result;
+    }
+  }
+  public static boolean curvesReady() { return Curves.TOTALS.isDone(); }
+  public static long totalAt(String id, int level) {
+    return Curves.TOTALS.join().get(id)[Math.clamp(level,0,200)];
+  }
+  public static double levelProgress(String job, int level, double raw) {
+    if (level == 200) return 0;
+    long required = requirement(job, level);
+    if (raw <= required) return raw;
+    double converted = raw - totalAt(job, level);
+    return converted >= 0 && converted <= required ? converted : Double.NaN;
+  }
+
   public static int milestone(int level) {
     return Math.min(200, (level / 5 + 1) * 5);
   }

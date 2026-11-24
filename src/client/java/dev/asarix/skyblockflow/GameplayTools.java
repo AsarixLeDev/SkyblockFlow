@@ -158,6 +158,7 @@ public final class GameplayTools {
     if (!app.store.config.tools.shopValues || app.recipes == null || !app.recipes.onExcalia()) return;
     for (String price : app.recipes.shopLines(stack, true))
       lines.add(dev.asarix.skyblockflow.ui.DisplayText.literal(price).withColor(0xffc578));
+    app.recipes.craftingValue(stack, lines);
   }
 
   public static Item icon(String key) {

@@ -1,245 +1,202 @@
 package dev.asarix.skyblockflow;
 
 import dev.asarix.skyblockflow.core.JobXp;
-import dev.asarix.skyblockflow.core.RecipeCatalog.Recipe;
-import dev.asarix.skyblockflow.core.RecipeCatalog.Station;
+import dev.asarix.skyblockflow.core.RecipeCatalog.*;
 import dev.asarix.skyblockflow.ui.RecipeScreen;
+import java.util.*;
 import java.util.concurrent.TimeUnit;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
-import net.minecraft.world.inventory.AbstractContainerMenu;
-import net.minecraft.world.inventory.ChestMenu;
-import net.minecraft.world.inventory.ContainerInput;
-import net.minecraft.world.inventory.CraftingMenu;
+import net.minecraft.world.inventory.*;
 import net.minecraft.world.item.ItemStack;
 
-/** Keeps a requested server menu behind the browser until the player presses Craft. */
+/** Keeps the requested server menu behind the browser; only Craft authorizes placement. */
 final class RecipePlacement {
   private enum Route { VANILLA, EXCALIA }
-  private static final long OPEN_TIMEOUT = TimeUnit.SECONDS.toNanos(4);
-  private static final long APPLY_TIMEOUT = TimeUnit.SECONDS.toNanos(2);
+  private static final long OPEN_TIMEOUT = TimeUnit.SECONDS.toNanos(5);
   private static final long MENU_SETTLE = TimeUnit.MILLISECONDS.toNanos(350);
-  private static final int BOOK_OUTPUT = 26;
-
   private final RecipeHelper helper;
   private final Minecraft mc = Minecraft.getInstance();
   private RecipeScreen viewer;
   private Recipe expected;
+  private String output;
   private Route route;
   private AbstractContainerScreen<?> background;
   private long deadline, menuArrived;
   private int readySlot = -1;
-  private boolean waiting, received, applying, failed, bookVisible;
+  private boolean waiting, received, applying, failed, contents, intent, maximum, selectedResult;
 
   RecipePlacement(RecipeHelper helper) { this.helper = helper; }
-
-  private Route route(Recipe recipe) {
-    if (recipe == null || !helper.canCraft(recipe)) return null;
-    if (recipe.station() == Station.VANILLA && helper.serverId(recipe) != null) return Route.VANILLA;
+  private boolean portable() { return mc.getConnection() != null && mc.getConnection().getCommands().getRoot().getChild("craft") != null; }
+  private Route route(Recipe recipe, Screen parent) {
+    if (recipe == null) return Route.EXCALIA;
+    if (!helper.canCraft(recipe)) return null;
+    if (recipe.station() == Station.VANILLA && recipe.hasGrid()
+        && (portable() || activeTable(parent))) return Route.VANILLA;
     return helper.usesExcaliaBook(recipe) ? Route.EXCALIA : null;
   }
-
   private boolean active(AbstractContainerScreen<?> screen) {
     return screen != null && mc.player != null && screen.getMenu() == mc.player.containerMenu;
   }
-
+  private boolean activeTable(Screen screen) {
+    return screen instanceof AbstractContainerScreen<?> table && active(table) && table.getMenu() instanceof CraftingMenu;
+  }
   private boolean emptyCursor() {
-    return mc.player != null && mc.gameMode != null && mc.player.isAlive()
-        && mc.player.containerMenu.getCarried().isEmpty();
+    return mc.player != null && mc.gameMode != null && mc.player.isAlive() && mc.player.containerMenu.getCarried().isEmpty();
   }
-
   private AbstractContainerScreen<?> vanillaTable(RecipeScreen owner, Screen parent) {
-    if (viewer == owner && active(background) && background.getMenu() instanceof CraftingMenu)
-      return background;
-    return parent instanceof AbstractContainerScreen<?> table && active(table)
-        && table.getMenu() instanceof CraftingMenu ? table : null;
+    if (viewer == owner && activeTable(background)) return background;
+    return activeTable(parent) ? (AbstractContainerScreen<?>)parent : null;
   }
-
   private boolean covers(RecipeScreen owner, Recipe recipe) {
-    return owner == viewer && expected != null && (expected.id().equals(recipe.id())
-        || route == Route.VANILLA && route(recipe) == Route.VANILLA);
+    String item = recipe == null ? owner.requestedItem() : recipe.output();
+    if (item != null) item = helper.recipeLookup(item);
+    return viewer == owner && Objects.equals(output,item);
   }
-
-  private boolean canLookup(Recipe recipe) {
-    return helper.onExcalia() && route(recipe) != null && emptyCursor();
+  private boolean canLookup(RecipeScreen owner, Recipe recipe, Screen parent) {
+    return helper.onExcalia() && route(recipe,parent) != null && emptyCursor()
+        && (recipe != null || owner.requestedItem() != null && !owner.requestedItem().startsWith("minecraft:"));
   }
-
   void begin(RecipeScreen owner, Recipe recipe, Screen parent) {
-    if (!canLookup(recipe) || mc.gui.screen() != owner || applying) return;
-    Route target = route(recipe);
-    if (target == Route.VANILLA && vanillaTable(owner, parent) != null) return;
-    if (covers(owner, recipe) && (waiting || active(background)) && !failed) return;
-    long now = System.nanoTime();
-    String command = target == Route.VANILLA ? "craft" : bookCommand(helper.name(recipe.output()));
-    if (command == null) return;
-    if (viewer != owner) background = null;
-    viewer = owner;
-    expected = recipe;
-    route = target;
-    waiting = true;
-    received = failed = bookVisible = false;
-    readySlot = -1;
-    deadline = now + OPEN_TIMEOUT;
+    if (!canLookup(owner,recipe,parent) || mc.gui.screen()!=owner || applying) return;
+    Route target = route(recipe,parent);
+    if (target==Route.VANILLA && vanillaTable(owner,parent)!=null) return;
+    if (covers(owner,recipe) && (waiting || active(background)) && !failed) return;
+    reset(); viewer=owner; expected=recipe; output=helper.recipeLookup(recipe==null?owner.requestedItem():recipe.output()); route=target;
+    open(target==Route.VANILLA ? "craft" : bookCommand(helper.name(output)));
+    owner.refreshCraftButton();
+  }
+  private void open(String command) {
+    if (command==null) { failed=true; return; }
+    waiting=true; received=contents=failed=false; readySlot=-1;
+    deadline=System.nanoTime()+OPEN_TIMEOUT;
     mc.player.connection.sendCommand(command);
   }
-
   private static String bookCommand(String name) {
-    String item = name.replaceAll("[\\p{Cc}\\p{Cf}]", " ").strip();
-    return item.isEmpty() || item.length() > 120 ? null : "cc livre " + item;
+    String item=name.replaceAll("[\\p{Cc}\\p{Cf}]"," ").strip();
+    return item.isEmpty()||item.length()>120?null:"cc livre "+item;
   }
-
   boolean capture(Screen current, Screen incoming) {
-    if (viewer == null || current != viewer || !(incoming instanceof AbstractContainerScreen<?> table)
-        || !active(table)) return false;
-    if (applying) {
-      reset();
-      return false;
-    }
-    if (!waiting || System.nanoTime() - deadline >= 0) {
-      reset();
-      return false;
-    }
-    boolean expectedMenu = route == Route.VANILLA ? table.getMenu() instanceof CraftingMenu
-        : table.getMenu() instanceof ChestMenu chest && chest.getRowCount() == 6;
-    if (!expectedMenu) {
-      reset();
-      return false;
-    }
-    background = table;
-    bookVisible = false;
-    received = true;
-    menuArrived = System.nanoTime();
-    if (route == Route.VANILLA) waiting = false;
+    if (viewer==null || current!=viewer || !(incoming instanceof AbstractContainerScreen<?> table) || !active(table)) return false;
+    if (applying) { reset(); return false; }
+    if (!waiting || System.nanoTime()>=deadline) { reset(); return false; }
+    boolean valid=route==Route.VANILLA ? table.getMenu() instanceof CraftingMenu
+        : table.getMenu() instanceof ChestMenu chest && chest.getRowCount()==6;
+    if (!valid) { reset(); return false; }
+    background=table; contents=false; received=true; menuArrived=System.nanoTime();
+    if (route==Route.VANILLA) waiting=false;
     return true;
   }
-
-  boolean keepViewer(Screen current) {
-    return viewer != null && current == viewer && (waiting || applying);
-  }
-
+  boolean keepViewer(Screen current) { return viewer!=null && current==viewer && (waiting||applying); }
   void tick() {
-    if (viewer == null) return;
-    if (mc.gui.screen() != viewer || mc.player == null || !mc.player.isAlive()) {
-      reset();
-      return;
-    }
-    long now = System.nanoTime();
-    if (applying && (now - deadline >= 0 || !active(background))) {
-      if (active(background)) showServerMenu();
-      else reset();
-    } else if (waiting && received && active(background)
-        && (readySlot = applySlot(background.getMenu(), expected)) >= 0) {
-      waiting = false;
-    } else if (waiting && now - deadline >= 0) {
-      waiting = false;
-      failed = !active(background);
-    } else if (waiting && !bookVisible && received && active(background) && now - menuArrived >= MENU_SETTLE) {
-      bookVisible = hasBookContents(background.getMenu());
-    }
-  }
-
-  // The recipe detail shows its result in the right-hand column. The labelled Apply slot is
-  // discovered from server items so search results or unrelated chests cannot be clicked.
-  private int applySlot(AbstractContainerMenu menu, Recipe recipe) {
-    if (!(menu instanceof ChestMenu chest) || chest.getRowCount() != 6) return -1;
-    ItemStack output = menu.getSlot(BOOK_OUTPUT).getItem();
-    if (output.isEmpty()) return -1;
-    String identity = helper.recipeLookup(helper.key(output));
-    if (!identity.equals(recipe.output()) && !(identity.startsWith("named:")
-        && normalizedName(output.getHoverName().getString()).equals(normalizedName(helper.name(recipe.output())))))
-      return -1;
-    long alternatives = helper.catalog().produces(recipe.output()).stream().filter(Recipe::hasGrid).limit(2).count();
-    if (alternatives > 1 && (!recipe.hasGrid() || recipe.cells().stream().anyMatch(cell -> {
-      var shown = menu.getSlot(cell.y() * 9 + cell.x() + 1).getItem();
-      return shown.getCount() != cell.ingredient().amount()
-          || !cell.ingredient().choices().contains(helper.key(shown));
-    }))) return -1;
-    int candidate = -1;
-    for (int i = 0; i < 54; i++) {
-      ItemStack stack = menu.getSlot(i).getItem();
-      if (stack.isEmpty()) continue;
-      String label = normalizedName(stack.getHoverName().getString());
-      if (!label.equals("appliquer la recette") && !label.startsWith("appliquer la recette (")) continue;
-      if (candidate >= 0) return -1;
-      candidate = i;
-    }
-    return candidate;
-  }
-
-  private static String normalizedName(String name) {
-    return JobXp.normalize(name).replaceAll("^[^\\p{L}\\p{N}]+", "").strip();
-  }
-
-  private static boolean hasBookContents(AbstractContainerMenu menu) {
-    for (int slot = 0; slot < 54; slot++) if (menu.getSlot(slot).hasItem()) return true;
-    return false;
-  }
-
-  RecipeHelper.CraftButton button(RecipeScreen owner, Recipe recipe, Screen parent) {
-    if (recipe == null) return RecipeHelper.CraftButton.GUIDE;
-    if (owner == viewer && applying) return RecipeHelper.CraftButton.APPLYING;
-    if (route(recipe) == Route.VANILLA && vanillaTable(owner, parent) != null && emptyCursor())
-      return RecipeHelper.CraftButton.CRAFT;
-    if (covers(owner, recipe)) {
-      if (waiting) return bookVisible && active(background)
-          ? RecipeHelper.CraftButton.BOOK : RecipeHelper.CraftButton.LOADING;
-      if (received && active(background) && route == Route.EXCALIA) {
-        if (emptyCursor() && readySlot >= 0)
-          return RecipeHelper.CraftButton.CRAFT;
-        return RecipeHelper.CraftButton.BOOK;
-      }
-      if (failed && canLookup(recipe)) return RecipeHelper.CraftButton.RETRY;
-    }
-    return canLookup(recipe) ? RecipeHelper.CraftButton.OPEN : RecipeHelper.CraftButton.GUIDE;
-  }
-
-  void press(RecipeScreen owner, Recipe recipe, Screen parent, boolean max) {
-    switch (button(owner, recipe, parent)) {
-      case CRAFT -> {
-        if (route(recipe) == Route.VANILLA) {
-          var table = vanillaTable(owner, parent);
-          reset();
-          helper.placeVanilla(recipe, table, max);
-        } else if (covers(owner, recipe) && active(background) && emptyCursor()) {
-          var menu = background.getMenu();
-          int apply = applySlot(menu, recipe);
-          if (apply < 0) {
-            readySlot = -1;
-            return;
-          }
-          applying = true;
-          deadline = System.nanoTime() + APPLY_TIMEOUT;
-          mc.gameMode.handleContainerInput(menu.containerId, apply, 0,
-              max ? ContainerInput.QUICK_MOVE : ContainerInput.PICKUP, mc.player);
+    if (viewer==null) return;
+    if (mc.gui.screen()!=viewer || mc.player==null || !mc.player.isAlive()) { reset(); return; }
+    long now=System.nanoTime();
+    if (applying) { if (now>=deadline || !active(background)) reveal(); return; }
+    if (received && active(background) && route==Route.EXCALIA) {
+      readySlot=applySlot(background.getMenu());
+      if (readySlot>=0) {
+        waiting=false;
+        var cells=new ArrayList<Cell>();
+        for(int y=0;y<6;y++) for(int x=0;x<6;x++) {
+          var stack=background.getMenu().getSlot(y*9+x+1).getItem();
+          if(!stack.isEmpty()) cells.add(new Cell(x,y,new Ingredient(helper.key(stack),stack.getCount())));
         }
+        expected=helper.learnGrid(expected,output,cells,background.getMenu().getSlot(26).getItem().getCount());
       }
-      case OPEN, RETRY -> begin(owner, recipe, parent);
-      case BOOK -> showServerMenu();
-      case GUIDE -> owner.showCraftGuide(recipe);
-      case LOADING, APPLYING -> { }
+      if(now-menuArrived>=MENU_SETTLE) contents=hasContents(background.getMenu());
     }
+    if (intent && received && active(background)) {
+      if(route==Route.VANILLA) { placeVanilla(); return; }
+      if(readySlot>=0) { apply(); return; }
+      if(contents && !selectedResult) {
+        int result=resultSlot(background.getMenu());
+        if(result>=0) {
+          selectedResult=true; contents=false; waiting=true; menuArrived=now; deadline=now+OPEN_TIMEOUT;
+          mc.gameMode.handleContainerInput(background.getMenu().containerId,result,0,ContainerInput.PICKUP,mc.player);
+          return;
+        }
+        helper.message("Choose the matching recipe in the crafting menu"); reveal(); return;
+      }
+    }
+    if(waiting && now>=deadline) { waiting=false; failed=true; if(intent) { helper.message("The crafting menu did not return the requested recipe"); reveal(); } }
   }
-
-  private void showServerMenu() {
-    var table = background;
-    reset();
-    if (active(table)) mc.gui.setScreen(table);
+  private boolean matches(ItemStack stack) {
+    if(stack.isEmpty()) return false;
+    String id=helper.recipeLookup(helper.key(stack));
+    return id.equals(output) || id.startsWith("named:") && normalized(stack.getHoverName().getString()).equals(normalized(helper.name(output)));
   }
-
+  private int applySlot(AbstractContainerMenu menu) {
+    if(!(menu instanceof ChestMenu chest) || chest.getRowCount()!=6 || !matches(menu.getSlot(26).getItem())) return -1;
+    long variants=helper.catalog().produces(output).stream().filter(Recipe::hasGrid).limit(2).count();
+    if(expected!=null && variants>1 && (!expected.hasGrid() || expected.cells().stream().anyMatch(cell->{
+      var stack=menu.getSlot(cell.y()*9+cell.x()+1).getItem();
+      return stack.getCount()!=cell.ingredient().amount() || !cell.ingredient().choices().contains(helper.key(stack));
+    }))) return -1;
+    int found=-1;
+    for(int i=0;i<54;i++) {
+      String label=normalized(menu.getSlot(i).getItem().getHoverName().getString());
+      if(!label.equals("appliquer la recette") && !label.startsWith("appliquer la recette (")) continue;
+      if(found>=0) return -1; found=i;
+    }
+    return found;
+  }
+  private int resultSlot(AbstractContainerMenu menu) {
+    int found=-1;
+    // The result list occupies three rows below the category tabs.
+    for(int i=18;i<45;i++) if(matches(menu.getSlot(i).getItem())) { if(found>=0) return -1; found=i; }
+    return found;
+  }
+  private static String normalized(String name) { return JobXp.normalize(name).replaceAll("^[^\\p{L}\\p{N}]+","").strip(); }
+  private static boolean hasContents(AbstractContainerMenu menu) {
+    for(int i=0;i<54;i++) if(menu.getSlot(i).hasItem()) return true; return false;
+  }
+  RecipeHelper.CraftButton button(RecipeScreen owner, Recipe recipe, Screen parent) {
+    if(owner==viewer && (applying || intent)) return RecipeHelper.CraftButton.APPLYING;
+    if(recipe!=null && recipe.station()==Station.VANILLA && vanillaTable(owner,parent)!=null && emptyCursor())
+      return RecipeHelper.CraftButton.CRAFT;
+    if(covers(owner,recipe)) {
+      if(waiting && !contents) return RecipeHelper.CraftButton.LOADING;
+      if(received && active(background) && emptyCursor()) return RecipeHelper.CraftButton.CRAFT;
+      if(failed && canLookup(owner,recipe,parent)) return RecipeHelper.CraftButton.RETRY;
+    }
+    return canLookup(owner,recipe,parent)?RecipeHelper.CraftButton.OPEN:RecipeHelper.CraftButton.GUIDE;
+  }
+  void press(RecipeScreen owner, Recipe recipe, Screen parent, boolean max) {
+    var button=button(owner,recipe,parent);
+    if(button==RecipeHelper.CraftButton.GUIDE) { if(recipe!=null) owner.showCraftGuide(recipe); return; }
+    if(button==RecipeHelper.CraftButton.APPLYING || button==RecipeHelper.CraftButton.LOADING) return;
+    var table=vanillaTable(owner,parent);
+    if(recipe!=null && recipe.station()==Station.VANILLA && table!=null && emptyCursor()) {
+      reset(); helper.placeVanilla(recipe,table,max); return;
+    }
+    if(!covers(owner,recipe) || failed) begin(owner,recipe,parent);
+    if(viewer!=owner) return;
+    intent=true; maximum=max; deadline=System.nanoTime()+OPEN_TIMEOUT;
+    tick();
+  }
+  private void placeVanilla() {
+    var table=background; var recipe=expected; boolean max=maximum;
+    reset(); helper.placeVanilla(recipe,table,max);
+  }
+  private void apply() {
+    if(!emptyCursor()) { helper.message("Empty the cursor before crafting"); reveal(); return; }
+    if(expected!=null && expected.station()==Station.VANILLA && expected.hasGrid() && portable()) {
+      route=Route.VANILLA; open("craft"); return;
+    }
+    applying=true; deadline=System.nanoTime()+TimeUnit.SECONDS.toNanos(3);
+    mc.gameMode.handleContainerInput(background.getMenu().containerId,readySlot,0,
+        maximum?ContainerInput.QUICK_MOVE:ContainerInput.PICKUP,mc.player);
+  }
+  private void reveal() {
+    var table=background; reset(); if(active(table)) mc.gui.setScreen(table);
+  }
   Screen close(RecipeScreen owner) {
-    if (viewer != owner) return null;
-    var table = active(background) ? background : null;
-    reset();
-    return table;
+    if(viewer!=owner) return null; var table=active(background)?background:null; reset(); return table;
   }
-
   void reset() {
-    viewer = null;
-    expected = null;
-    route = null;
-    background = null;
-    waiting = received = applying = failed = bookVisible = false;
-    readySlot = -1;
+    viewer=null; expected=null; output=null; route=null; background=null;
+    waiting=received=applying=failed=contents=intent=maximum=selectedResult=false; readySlot=-1;
   }
 }

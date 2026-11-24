@@ -1,0 +1,6 @@
+#!/bin/sh
+set -eu
+while read -r localref sha remote_ref old; do
+  case "$sha" in 0000000000000000000000000000000000000000) continue;; esac
+  python3 tools/release.py --commit "$sha" --ref "$remote_ref"
+done

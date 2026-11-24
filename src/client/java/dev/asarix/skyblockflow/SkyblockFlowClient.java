@@ -63,10 +63,12 @@ public final class SkyblockFlowClient implements ClientModInitializer {
 
   public RecipeHelper recipes;
   public ExcaliaApiService excaliaApi;
+  public IslandFlight islandFlight;
   private LegacyConfigPrompt configMigration;
 
   @Override
   public void onInitializeClient() {
+    dev.asarix.flow.update.Updates.register("skyblockflow");
     INSTANCE = this;
     store = new ConfigStore(FabricLoader.getInstance().getConfigDir().resolve("skyblockflow"));
     try {
@@ -88,6 +90,7 @@ public final class SkyblockFlowClient implements ClientModInitializer {
     spawners = new SpawnerRanges(this);
     recipes = new RecipeHelper(this);
     excaliaApi = new ExcaliaApiService(this);
+    islandFlight = new IslandFlight(this);
     tools = new GameplayTools(this);
     net.fabricmc.fabric.api.client.command.v2.ClientCommandRegistrationCallback.EVENT.register(
         (dispatcher, registry) ->
@@ -417,6 +420,7 @@ public final class SkyblockFlowClient implements ClientModInitializer {
 
   public static AlarmKind alarmKind(String source) {
     return switch (source) {
+      case "Island flight" -> AlarmKind.ISLAND_FLIGHT;
       case "Pets" -> AlarmKind.PETS;
       case "Leaderboard" -> AlarmKind.RANK;
       case "Rocket oxygen" -> AlarmKind.ROCKET;
@@ -428,6 +432,7 @@ public final class SkyblockFlowClient implements ClientModInitializer {
   }
 
   public void commandSent(String command) {
+    if (islandFlight != null) islandFlight.commandSent(command);
     if (closest != null && closest.internalCommand()) return;
     String recent = "/" + command.replaceFirst("^/", "");
     recentCommands.remove(recent);
