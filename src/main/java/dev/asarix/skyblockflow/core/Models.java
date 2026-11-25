@@ -42,7 +42,8 @@ public final class Models {
     ESPORTS,
     ALARMS,
     COMMUNITY_NAMES,
-    ISLAND_FLIGHT
+    ISLAND_FLIGHT,
+    RECIPES
   }
 
   public static class FeatureOptions {
@@ -182,7 +183,7 @@ public final class Models {
     public Map<Feature, FeatureOptions> features = new LinkedHashMap<>();
     public JobSettings jobs = new JobSettings();
     public List<TimerSettings> timers = new ArrayList<>();
-    public boolean copyChatOnClick = true, compactChat = true;
+    public boolean copyChatOnClick = true, compactChat = true, chatTabs = true;
     public Map<String, AlarmPresentation> namedAlarmStyles = new LinkedHashMap<>();
     public Map<AlarmKind, AlarmPresentation> alarmStyles = new LinkedHashMap<>();
     public HudSettings hud = new HudSettings();

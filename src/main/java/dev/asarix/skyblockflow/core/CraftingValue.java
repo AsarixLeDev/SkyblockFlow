@@ -27,76 +27,125 @@ public final class CraftingValue {
     BigDecimal decimal() { return new BigDecimal(n).divide(new BigDecimal(d), MathContext.DECIMAL128); }
     public int compareTo(Fraction b) { return n.multiply(b.d).compareTo(b.n.multiply(d)); }
   }
-  private record Leaf(String item, Fraction amount, Fraction cost) {}
-  private record Cost(Fraction unit, List<Leaf> leaves) {}
+  private record Branch(Cost source, Fraction amount) {}
+  // Plans share immutable subtrees; ingredient details are expanded only for the final result.
+  private record Cost(long order, Fraction unit, String item, List<Branch> branches) {}
+  private static final class Budget {
+    final long deadline = System.nanoTime() + 250_000_000L;
+    int operations;
+    long sequence;
+    void step() {
+      checkCancelled();
+      if (++operations > 100_000 || System.nanoTime() > deadline) throw new ArithmeticException("Cost budget");
+    }
+  }
 
   public static Optional<Value> calculate(RecipeCatalog catalog, String output, Function<String, BigDecimal> buy) {
-    if (catalog.produces(output).isEmpty()) return Optional.empty();
-    try {
-      var reachable = new LinkedHashSet<String>();
-      var queue = new ArrayDeque<String>();
-      for (var recipe : catalog.produces(output)) for (var ingredient : recipe.ingredients()) queue.addAll(ingredient.choices());
-      while (!queue.isEmpty()) {
-        String item = queue.removeFirst();
-        if (item.equals(output) || !reachable.add(item)) continue;
-        if (reachable.size() > 4096) return Optional.empty();
-        for (var recipe : catalog.produces(item)) for (var ingredient : recipe.ingredients()) queue.addAll(ingredient.choices());
-      }
-      var costs = new HashMap<String, Cost>();
-      for (String item : reachable) {
-        var price = buy.apply(item);
-        if (price != null && price.signum() >= 0) {
-          var unit = Fraction.of(price);
-          costs.put(item, new Cost(unit, List.of(new Leaf(item, Fraction.of(1), unit))));
-        }
-      }
-      var recipes = catalog.recipes().stream().filter(r -> reachable.contains(r.output())).toList();
-      boolean settled = false;
-      for (int pass = 0; pass <= reachable.size(); pass++) {
-        boolean changed = false;
-        for (var recipe : recipes) {
-          var candidate = cost(recipe, costs);
-          var prior = costs.get(recipe.output());
-          if (candidate != null && (prior == null || candidate.unit.compareTo(prior.unit) < 0)) {
-            costs.put(recipe.output(), candidate); changed = true;
+    return calculate(catalog, output, inputs(catalog, output), buy);
+  }
+
+  public static Set<String> inputs(RecipeCatalog catalog, String output) {
+    var reachable = new LinkedHashSet<String>();
+    var queue = new ArrayDeque<String>();
+    queue.add(output);
+    while (!queue.isEmpty()) {
+      checkCancelled();
+      for (var recipe : catalog.produces(queue.removeFirst())) {
+        for (var ingredient : recipe.ingredients()) for (String item : ingredient.choices()) {
+          if (!item.equals(output) && reachable.add(item)) {
+            if (reachable.size() > 4096) return Set.of();
+            queue.addLast(item);
           }
         }
-        if (!changed) { settled = true; break; }
       }
-      if (!settled) return Optional.empty();
+    }
+    return reachable;
+  }
+
+  private static void checkCancelled() {
+    if (Thread.currentThread().isInterrupted()) throw new java.util.concurrent.CancellationException();
+  }
+
+  public static Optional<Value> calculate(RecipeCatalog catalog, String output, Set<String> reachable,
+                                          Function<String, BigDecimal> buy) {
+    if (reachable.isEmpty()) return Optional.empty();
+    try {
+      var budget = new Budget();
+      var costs = new HashMap<String, Cost>();
+      for (String item : reachable) {
+        budget.step();
+        var price = buy.apply(item);
+        if (price != null && price.signum() >= 0)
+          costs.put(item, new Cost(++budget.sequence, Fraction.of(price), item, List.of()));
+      }
+      var pending = new ArrayDeque<Recipe>();
+      var queued = new HashSet<String>();
+      for (String item : reachable) for (var recipe : catalog.produces(item))
+        if (queued.add(recipe.id())) pending.addLast(recipe);
+      while (!pending.isEmpty()) {
+        budget.step();
+        var recipe = pending.removeFirst();
+        queued.remove(recipe.id());
+        var candidate = improvement(recipe, costs, costs.get(recipe.output()), budget);
+        if (candidate == null) continue;
+        costs.put(recipe.output(), candidate);
+        for (var dependent : catalog.uses(recipe.output())) {
+          if (reachable.contains(dependent.output()) && queued.add(dependent.id())) pending.addLast(dependent);
+        }
+      }
       Cost best = null;
       for (var recipe : catalog.produces(output)) {
-        var candidate = cost(recipe, costs);
-        if (candidate != null && (best == null || candidate.unit.compareTo(best.unit) < 0)) best = candidate;
+        budget.step();
+        var candidate = improvement(recipe, costs, best, budget);
+        if (candidate != null) best = candidate;
       }
       if (best == null) return Optional.empty();
-      var merged = new LinkedHashMap<String, Leaf>();
-      for (var leaf : best.leaves) merged.merge(leaf.item, leaf,
-          (a,b) -> new Leaf(a.item, a.amount.add(b.amount), a.cost.add(b.cost)));
-      return Optional.of(new Value(best.unit.decimal(), merged.values().stream()
-          .map(l -> new Part(l.item, l.amount.decimal(), l.cost.decimal())).toList()));
+      return Optional.of(new Value(best.unit.decimal(), expand(best, budget)));
     } catch (ArithmeticException failure) { return Optional.empty(); }
   }
 
-  private static Cost cost(Recipe recipe, Map<String, Cost> costs) {
+  private static Cost improvement(Recipe recipe, Map<String, Cost> costs, Cost prior, Budget budget) {
     Fraction total = Fraction.of(0);
-    var leaves = new ArrayList<Leaf>();
+    var branches = new ArrayList<Branch>(recipe.ingredients().size());
     for (var ingredient : recipe.ingredients()) {
       Cost cheapest = null;
       for (String choice : ingredient.choices()) {
+        budget.step();
         var candidate = costs.get(choice);
         if (candidate != null && (cheapest == null || candidate.unit.compareTo(cheapest.unit) < 0)) cheapest = candidate;
       }
       if (cheapest == null) return null;
       Fraction amount = Fraction.of(ingredient.amount()).divided(recipe.amount());
       total = total.add(cheapest.unit.times(amount));
-      for (var leaf : cheapest.leaves) leaves.add(new Leaf(leaf.item, leaf.amount.times(amount), leaf.cost.times(amount)));
-      if (leaves.size() > 8192) return null;
+      if (prior != null && total.compareTo(prior.unit) >= 0) return null;
+      branches.add(new Branch(cheapest, amount));
     }
-    // Merge at every level so shared raw ingredients cannot create exponential detail lists.
-    var merged = new LinkedHashMap<String, Leaf>();
-    for (var leaf : leaves) merged.merge(leaf.item, leaf,
-        (a,b) -> new Leaf(a.item, a.amount.add(b.amount), a.cost.add(b.cost)));
-    return new Cost(total, List.copyOf(merged.values()));
+    return new Cost(++budget.sequence, total, null, List.copyOf(branches));
+  }
+
+  private static List<Part> expand(Cost root, Budget budget) {
+    var amounts = new IdentityHashMap<Cost, Fraction>();
+    var pending = new PriorityQueue<Cost>(Comparator.comparingLong(Cost::order).reversed());
+    var quantities = new TreeMap<String, Fraction>();
+    var totals = new HashMap<String, Fraction>();
+    amounts.put(root, Fraction.of(1)); pending.add(root);
+    // A plan references only older nodes. Process newest first to merge shared demand before expansion.
+    while (!pending.isEmpty()) {
+      budget.step();
+      var node = pending.remove();
+      var amount = amounts.remove(node);
+      if (node.item != null) {
+        quantities.merge(node.item, amount, Fraction::add);
+        totals.merge(node.item, node.unit.times(amount), Fraction::add);
+      } else for (var branch : node.branches) {
+        budget.step();
+        var required = amount.times(branch.amount);
+        if (!amounts.containsKey(branch.source)) pending.add(branch.source);
+        amounts.merge(branch.source, required, Fraction::add);
+      }
+    }
+    var parts = new ArrayList<Part>(quantities.size());
+    quantities.forEach((item, amount) -> parts.add(new Part(item, amount.decimal(), totals.get(item).decimal())));
+    return List.copyOf(parts);
   }
 }

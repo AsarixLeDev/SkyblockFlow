@@ -39,6 +39,7 @@ public final class RecipeScreen extends Screen {
   private String item;
   private View view;
   private boolean materials, craftGuide, options;
+  private long itemIndexRevision;
   private CraftButton currentCraftButton;
   private Recipe selected;
   private RecipeCatalog indexed;
@@ -137,6 +138,8 @@ public final class RecipeScreen extends Screen {
       helper.save();
       rebuildWidgets();
     }).setTooltip(tip("Hide this mod's HUD while viewing recipes"));
+    add(left, y + 118, wide, "Disable recipe helper", () -> helper.setEnabled(false))
+        .setTooltip(tip("Turn off the browser, materials and shortcuts. Re-enable in Features → Recipe helper."));
   }
 
   private void addChecklistControls() {
@@ -191,6 +194,7 @@ public final class RecipeScreen extends Screen {
 
   private void updateIndex() {
     indexed = helper.catalog();
+    itemIndexRevision = helper.itemIndexRevision();
     filterItems();
   }
 
@@ -337,7 +341,8 @@ public final class RecipeScreen extends Screen {
   @Override
   public void tick() {
     super.tick();
-    if (indexed != helper.catalog()) {
+    if (!helper.enabled()) { onClose(); return; }
+    if (indexed != helper.catalog() || itemIndexRevision != helper.itemIndexRevision()) {
       updateIndex();
       updateResults();
     }

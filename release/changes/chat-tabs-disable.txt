@@ -1,0 +1,4 @@
+Type: Feature
+Author: Asarix
+Summary: Make chat tabs optional
+Details: Disabling tabs restores all messages to one chat view without changing chat alerts or compression.

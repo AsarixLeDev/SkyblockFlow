@@ -48,6 +48,7 @@ public abstract class ChatCompactionMixin implements ChatTabAccess {
 
   @Override
   public void skyblockflow$tab(Tab tab) {
+    if (!ChatTabAccess.enabled()) tab = Tab.ALL;
     if (tab == skyblockflow$tab) return;
     skyblockflow$tab = tab;
     skyblockflow$channels.clear();
@@ -57,7 +58,7 @@ public abstract class ChatCompactionMixin implements ChatTabAccess {
   }
 
   @Unique private boolean skyblockflow$matchesTab(GuiMessage message) {
-    if (skyblockflow$tab == Tab.ALL) return true;
+    if (!ChatTabAccess.enabled() || skyblockflow$tab == Tab.ALL) return true;
     byte channel = skyblockflow$channels.computeIfAbsent(message, this::skyblockflow$classify);
     if (skyblockflow$tab == Tab.MP) return channel == 3;
     return channel == 2 || channel == 3 || (channel == 1) == (skyblockflow$tab == Tab.CHAT);
@@ -115,7 +116,7 @@ public abstract class ChatCompactionMixin implements ChatTabAccess {
 
   @Inject(method = "addMessageToQueue", at = @At("HEAD"))
   private void skyblockflow$receive(GuiMessage message, CallbackInfo ci) {
-    skyblockflow$channels.computeIfAbsent(message, this::skyblockflow$classify);
+    if (ChatTabAccess.enabled()) skyblockflow$channels.computeIfAbsent(message, this::skyblockflow$classify);
     skyblockflow$removed = allMessages.size() >= 100 ? allMessages.getLast() : null;
     if (!skyblockflow$enabled()) return;
     long now = System.nanoTime() / 1_000_000L;

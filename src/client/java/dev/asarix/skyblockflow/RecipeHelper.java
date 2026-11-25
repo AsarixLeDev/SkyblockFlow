@@ -9,6 +9,11 @@ import dev.asarix.skyblockflow.ui.InventoryRecipeDock;
 import dev.asarix.skyblockflow.ui.RecipeScreen;
 import dev.asarix.skyblockflow.ui.Ui;
 import java.util.*;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.FutureTask;
+import java.util.concurrent.Future;
+import net.minecraft.client.gui.screens.recipebook.RecipeCollection;
+import net.minecraft.util.context.ContextMap;
 import net.fabricmc.fabric.api.client.command.v2.ClientCommandRegistrationCallback;
 import com.mojang.brigadier.builder.LiteralArgumentBuilder;
 import net.fabricmc.fabric.api.client.command.v2.FabricClientCommandSource;
@@ -59,7 +64,7 @@ public final class RecipeHelper {
   private long inspectedSince, lastInspected;
   private final Map<String, Recipe> seasonById = new HashMap<>();
   private final Map<String, String> modelIds = new HashMap<>();
-  private final Map<String, RecipeDisplayId> serverRecipes = new HashMap<>();
+  private Map<String, RecipeDisplayId> serverRecipes = new HashMap<>();
   private final InventoryRecipeDock.State inventoryBrowser = new InventoryRecipeDock.State();
   private RecipeCatalog indexedItems;
   private net.minecraft.locale.Language indexedLanguage;
@@ -67,6 +72,27 @@ public final class RecipeHelper {
 
   public record ItemTile(String id, Recipe recipe, String search) {}
   private List<?> recipeCollections;
+  private CatalogBuild building;
+  private boolean catalogRequested;
+  private final ExecutorService catalogWorker = java.util.concurrent.Executors.newSingleThreadExecutor(task -> {
+    var thread = new Thread(task, "Flow recipe index");
+    thread.setDaemon(true); thread.setPriority(Thread.MIN_PRIORITY); return thread;
+  });
+  private Future<?> vanillaReady;
+  private long itemIndexRevision;
+  private ItemIndexBuild itemBuild;
+  private final List<String> vanillaItems = BuiltInRegistries.ITEM.keySet().stream().sorted()
+      .filter(id -> BuiltInRegistries.ITEM.getValue(id) != Items.AIR).map(Object::toString).toList();
+  private static final class ItemIndexBuild {
+    final RecipeCatalog catalog;
+    final net.minecraft.locale.Language language;
+    final Future<List<String>> ids;
+    Iterator<String> remaining;
+    final List<ItemTile> tiles = new ArrayList<>();
+    ItemIndexBuild(RecipeCatalog catalog, net.minecraft.locale.Language language, Future<List<String>> ids) {
+      this.catalog = catalog; this.language = language; this.ids = ids;
+    }
+  }
   private Object level;
   private boolean seasonActive;
   private RecipeCatalog catalog = new RecipeCatalog(List.of());
@@ -90,6 +116,10 @@ public final class RecipeHelper {
             action.defaultKey, category)));
     net.fabricmc.fabric.api.client.networking.v1.ClientPlayConnectionEvents.DISCONNECT.register(
         (handler, client) -> {
+          pricing.reset();
+          discardBuild();
+          discardItemBuild();
+          catalogRequested = false;
           level = null;
           recipeCollections = null;
           icons.clear();
@@ -103,19 +133,26 @@ public final class RecipeHelper {
           vanillaPlacement.reset();
           observedRecipes.clear();
         });
-    ClientTickEvents.END_CLIENT_TICK.register(client -> { placement.tick(); vanillaPlacement.tick(); });
+    ClientTickEvents.END_CLIENT_TICK.register(client -> {
+      if (!enabled()) { cancelPending(); return; }
+      if (catalogRequested || building != null) advanceCatalog();
+      advanceItemIndex();
+      placement.tick(); vanillaPlacement.tick(); pricing.tick();
+    });
+    net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientLifecycleEvents.CLIENT_STOPPING.register(client -> { pricing.close(); discardBuild(); discardItemBuild(); catalogWorker.shutdownNow(); });
     ClientCommandRegistrationCallback.EVENT.register((dispatcher, registries) ->
         dispatcher.register(LiteralArgumentBuilder.<FabricClientCommandSource>literal("skyblockflowrecipes").executes(context -> {
+          if (!enabled()) return 0;
           mc.schedule(() -> open(mc.gui.screen(), null, false, false));
           return 1;
         })));
     ScreenEvents.AFTER_INIT.register((client, screen, width, height) -> {
-      if (screen instanceof AbstractContainerScreen<?> container)
+      if (enabled() && screen instanceof AbstractContainerScreen<?> container)
         InventoryRecipeDock.attach(this, container, inventoryBrowser);
     });
     HudElementRegistry.addLast(Identifier.fromNamespaceAndPath("skyblockflow", "recipe_checklist"),
         (graphics, tickCounter) -> {
-          if (settings().showChecklist && mc.player != null && !mc.gui.hud.isHidden()
+          if (enabled() && settings().showChecklist && mc.player != null && !mc.gui.hud.isHidden()
               && mc.gui.screen() == null)
             drawChecklist(graphics, graphics.guiWidth() - Math.min(242, graphics.guiWidth() / 2) - 8,
                 30, Math.min(242, graphics.guiWidth() / 2), Math.max(32, graphics.guiHeight() / 2), 0);
@@ -123,6 +160,20 @@ public final class RecipeHelper {
   }
 
   public RecipeSettings settings() { return app.store.config.tools.recipes; }
+  public boolean enabled() { return settings().enabled && app.store.config.enabled(Models.Feature.RECIPES); }
+  public void setEnabled(boolean enabled) {
+    settings().enabled = enabled;
+    app.store.config.feature(Models.Feature.RECIPES).enabled = enabled;
+    if (!enabled) cancelPending();
+    save();
+  }
+  private void cancelPending() {
+    if (mc.gui.screen() instanceof RecipeScreen viewer) viewer.onClose();
+    placement.reset(); vanillaPlacement.reset(); pricing.reset();
+    discardBuild(); discardItemBuild(); catalogRequested = false;
+    if (vanillaReady != null && !vanillaReady.isDone()) { vanillaReady.cancel(true); vanillaReady = null; }
+    inspectedItem = "";
+  }
 
   public static void addBackgroundHud(Identifier id, HudElement renderer) {
     HudElementRegistry.addLast(id, (graphics, tick) -> {
@@ -134,30 +185,30 @@ public final class RecipeHelper {
 
   public boolean hideBackgroundOverlays() {
     var screen = mc.gui.screen();
-    return settings().hideBackgroundOverlays && (screen instanceof RecipeScreen
+    return enabled() && settings().hideBackgroundOverlays && (screen instanceof RecipeScreen
         || screen instanceof AbstractContainerScreen<?> && !settings().inventoryDockHidden);
   }
 
   public enum CraftButton { CRAFT, OPEN, LOADING, RETRY, APPLYING, GUIDE }
 
   public void prepareCraft(RecipeScreen viewer, Recipe recipe, Screen parent) {
-    placement.begin(viewer, recipe, parent);
+    if (enabled()) placement.begin(viewer, recipe, parent);
   }
 
   public CraftButton craftButton(RecipeScreen viewer, Recipe recipe, Screen parent) {
-    return placement.button(viewer, recipe, parent);
+    return enabled() ? placement.button(viewer, recipe, parent) : CraftButton.GUIDE;
   }
 
   public void pressCraft(RecipeScreen viewer, Recipe recipe, Screen parent, boolean max) {
-    placement.press(viewer, recipe, parent, max);
+    if (enabled()) placement.press(viewer, recipe, parent, max);
   }
 
   public boolean captureCraftMenu(Screen current, Screen incoming) {
-    return placement.capture(current, incoming);
+    return enabled() && placement.capture(current, incoming);
   }
 
   public boolean keepCraftViewer(Screen current) {
-    return placement.keepViewer(current);
+    return enabled() && placement.keepViewer(current);
   }
 
   public Screen closeCraftViewer(RecipeScreen viewer) {
@@ -169,6 +220,7 @@ public final class RecipeHelper {
   public void save() { app.save(); }
 
   public Action action(KeyEvent event) {
+    if (!enabled()) return null;
     for (var entry : keys.entrySet())
       if (entry.getValue().matches(event)) return entry.getKey();
     return null;
@@ -193,6 +245,7 @@ public final class RecipeHelper {
   }
 
   public void openSelected(Screen parent, String item, Recipe preferred) {
+    if (!enabled()) return;
     Recipe recipe = preferred == null ? recipeFor(item) : preferred;
     var viewer = new RecipeScreen(this, parent, item, false, false, recipe);
     mc.gui.setScreen(viewer);
@@ -200,6 +253,7 @@ public final class RecipeHelper {
   }
 
   private void open(Screen parent, String item, boolean uses, boolean showMaterials, Recipe preferred) {
+    if (!enabled()) return;
     catalog();
     mc.gui.setScreen(new RecipeScreen(this, parent, item, uses, showMaterials, preferred));
   }
@@ -207,20 +261,7 @@ public final class RecipeHelper {
   public List<ItemTile> items(String query, boolean pinnedOnly) {
     var current = catalog();
     var language = net.minecraft.locale.Language.getInstance();
-    if (indexedItems != current || indexedLanguage != language) {
-      indexedItems = current;
-      indexedLanguage = language;
-      var ids = new LinkedHashSet<String>();
-      for (Recipe recipe : current.recipes()) {
-        ids.add(recipe.output());
-        for (Ingredient input : recipe.ingredients()) ids.addAll(input.choices());
-      }
-      ids.addAll(season.items().keySet());
-      BuiltInRegistries.ITEM.keySet().stream().sorted().forEach(key -> {
-        if (BuiltInRegistries.ITEM.getValue(key) != Items.AIR) ids.add(key.toString());
-      });
-      itemIndex = ids.stream().map(id -> itemTile(id, null)).toList();
-    }
+    if (indexedItems != current || indexedLanguage != language) requestItemIndex(current, language);
     var source = pinnedOnly
         ? settings().pins.stream().map(current::get).filter(Objects::nonNull)
             .map(recipe -> itemTile(recipe.output(), recipe)).toList()
@@ -234,36 +275,131 @@ public final class RecipeHelper {
     }).toList();
   }
 
+  public long itemIndexRevision() { return itemIndexRevision; }
+
+  private void requestItemIndex(RecipeCatalog current, net.minecraft.locale.Language language) {
+    if (itemBuild != null && itemBuild.catalog == current && itemBuild.language == language) return;
+    discardItemBuild();
+    itemBuild = new ItemIndexBuild(current, language, catalogWorker.submit(() -> {
+      var ids = new LinkedHashSet<String>();
+      for (var recipe : current.recipes()) {
+        ids.add(recipe.output());
+        for (var ingredient : recipe.ingredients()) ids.addAll(ingredient.choices());
+      }
+      ids.addAll(season.items().keySet()); ids.addAll(vanillaItems);
+      return List.copyOf(ids);
+    }));
+  }
+
+  private void discardItemBuild() {
+    if (itemBuild != null) itemBuild.ids.cancel(true);
+    itemBuild = null;
+  }
+
+  private void advanceItemIndex() {
+    var build = itemBuild;
+    if (build == null || !build.ids.isDone()) return;
+    if (build.ids.state() != Future.State.SUCCESS) { discardItemBuild(); return; }
+    if (build.remaining == null) build.remaining = build.ids.resultNow().iterator();
+    long started = System.nanoTime();
+    for (int n = 0; n < 32 && build.remaining.hasNext(); n++) {
+      build.tiles.add(itemTile(build.remaining.next(), null));
+      if (System.nanoTime() - started >= 1_000_000L) return;
+    }
+    if (build.remaining.hasNext()) return;
+    itemIndex = List.copyOf(build.tiles); indexedItems = build.catalog; indexedLanguage = build.language;
+    itemBuild = null; itemIndexRevision++;
+  }
+
   private ItemTile itemTile(String id, Recipe recipe) {
     return new ItemTile(id, recipe, RecipeCatalog.searchKey(name(id)) + " " + RecipeCatalog.searchKey(id));
   }
 
+  private List<RecipeCollection> collections() {
+    return mc.player == null ? List.of() : mc.player.getRecipeBook().getCollections();
+  }
+
+  RecipeCatalog readyCatalog() {
+    return building == null && matchesCatalog(collections(), onExcalia()) ? catalog : null;
+  }
+
+  private boolean matchesCatalog(List<?> collections, boolean excalia) {
+    return level == mc.level && recipeCollections == collections && seasonActive == excalia;
+  }
+
+  private static final class CatalogBuild {
+    final List<Recipe> entries = new ArrayList<>();
+    final Map<String, RecipeDisplayId> serverIds = new HashMap<>();
+    final ContextMap context;
+    int group, recipe;
+    FutureTask<RecipeCatalog> index;
+
+    CatalogBuild(ContextMap context) { this.context = context; }
+  }
+
+  private void discardBuild() {
+    if (building != null) recipeCollections = null;
+    if (building != null && building.index != null) building.index.cancel(true);
+    building = null;
+  }
+
   public RecipeCatalog catalog() {
-    var collections = mc.player == null ? List.of() : mc.player.getRecipeBook().getCollections();
-    boolean excalia = onExcalia();
-    if (level == mc.level && recipeCollections == collections && seasonActive == excalia) return catalog;
-    if (level != mc.level) icons.clear();
-    level = mc.level;
-    recipeCollections = collections;
-    seasonActive = excalia;
-    var entries = new ArrayList<Recipe>();
-    // Season data remains browsable offline. Live prices and custom actions are scoped to Excalia.
-    entries.addAll(observedRecipes.values());
-    entries.addAll(season.recipes());
-    serverRecipes.clear();
-    if (mc.level != null && mc.player != null) {
-      var context = SlotDisplayContext.fromLevel(mc.level);
-      for (var group : mc.player.getRecipeBook().getCollections())
-        for (var entry : group.getRecipes()) addServerRecipe(entry, context, entries);
-    }
-    entries.addAll(VanillaRecipeCatalog.load());
-    catalog = new RecipeCatalog(entries);
-    previousRecipe = null;
+    catalogRequested = true;
     return catalog;
   }
 
-  private void addServerRecipe(RecipeDisplayEntry entry, net.minecraft.util.context.ContextMap context,
-                                List<Recipe> recipes) {
+  void requestCatalog() { catalogRequested = true; }
+
+  // Every caller reads the last published snapshot. Only ticks advance bounded client work.
+  private void advanceCatalog() {
+    if (vanillaReady == null) vanillaReady = catalogWorker.submit(VanillaRecipeCatalog::load);
+    if (!vanillaReady.isDone()) return;
+    var collections = collections();
+    boolean excalia = onExcalia();
+    if (!matchesCatalog(collections, excalia)) {
+      discardBuild();
+      if (level != mc.level) icons.clear();
+      level = mc.level;
+      recipeCollections = collections;
+      seasonActive = excalia;
+      building = new CatalogBuild(mc.player == null || mc.level == null ? null : SlotDisplayContext.fromLevel(mc.level));
+      building.entries.addAll(observedRecipes.values());
+      building.entries.addAll(season.recipes());
+    }
+    var build = building;
+    if (build == null) { catalogRequested = false; return; }
+    long start = System.nanoTime();
+    while (build.context != null && build.group < collections.size()) {
+      var group = collections.get(build.group).getRecipes();
+      if (build.recipe < group.size()) {
+        addServerRecipe(group.get(build.recipe++), build.context, build.entries, build.serverIds);
+      } else {
+        build.group++;
+        build.recipe = 0;
+      }
+      if (System.nanoTime() - start >= 1_000_000L) return;
+    }
+    if (build.index == null) {
+      build.index = new FutureTask<>(() -> {
+        build.entries.addAll(VanillaRecipeCatalog.load());
+        return new RecipeCatalog(build.entries);
+      });
+      catalogWorker.execute(build.index);
+    }
+    if (!build.index.isDone()) return;
+    if (build.index.state() != Future.State.SUCCESS) {
+      status = "Recipe list could not be loaded";
+      discardBuild(); catalogRequested = false; recipeCollections = null;
+      return;
+    }
+    catalog = build.index.resultNow();
+    serverRecipes = build.serverIds;
+    previousRecipe = null;
+    building = null; catalogRequested = false;
+  }
+
+  private void addServerRecipe(RecipeDisplayEntry entry, ContextMap context, List<Recipe> recipes,
+                               Map<String, RecipeDisplayId> serverIds) {
     var display = entry.display();
     int width;
     List<SlotDisplay> slots;
@@ -313,15 +449,17 @@ public final class RecipeHelper {
         : "Smithing table · server recipe book";
     recipes.add(new Recipe(id, output, result.getCount(), station, width == 1 ? 1 : 3,
         ingredients, cells, note, true));
-    if (station == Station.VANILLA) serverRecipes.putIfAbsent(id, entry.id());
+    if (station == Station.VANILLA) serverIds.putIfAbsent(id, entry.id());
     if (icons.size() < 4096) icons.putIfAbsent(output, result.copyWithCount(1));
   }
 
   public RecipeDisplayId serverId(Recipe recipe) {
     if (recipe == null) return null;
+    var current = readyCatalog();
+    if (current == null) { requestCatalog(); return null; }
     var direct = serverRecipes.get(recipe.id());
     if (direct != null) return direct;
-    return catalog().produces(recipe.output()).stream()
+    return current.produces(recipe.output()).stream()
         .filter(r -> r.station() == recipe.station() && r.amount() == recipe.amount()
             && r.ingredients().size() == recipe.ingredients().size()
             && new HashSet<>(r.ingredients()).equals(new HashSet<>(recipe.ingredients())))
@@ -480,6 +618,7 @@ public final class RecipeHelper {
   }
 
   public void handle(Action action, String item, Recipe selected, Screen parent, boolean max) {
+    if (!enabled()) return;
     if (action == Action.RECIPES || action == Action.USES) {
       open(parent, item, action == Action.USES, false, action == Action.RECIPES ? selected : null);
       return;
@@ -532,6 +671,7 @@ public final class RecipeHelper {
   }
 
   public void craft(Recipe recipe, Screen parent, boolean max) {
+    if (!enabled()) return;
     if (!canCraft(recipe)) return;
     if (mc.gui.screen() instanceof RecipeScreen existing) {
       pressCraft(existing, recipe, parent, max);
@@ -638,9 +778,9 @@ public final class RecipeHelper {
       Ui.scrollBar(g, x + width - 3, y + 19, rows * 19, total * 19, offset * 19);
   }
 
-  public boolean inspectOutside() { return settings().inspection == Inspection.EVERYWHERE; }
+  public boolean inspectOutside() { return enabled() && settings().inspection == Inspection.EVERYWHERE; }
 
-  public boolean inspectInside() { return settings().inspection != Inspection.OFF; }
+  public boolean inspectInside() { return enabled() && settings().inspection != Inspection.OFF; }
 
   public void inspect(GuiGraphicsExtractor g, ItemStack stack, int mouseX, int mouseY) {
     inspect(g, remember(stack), stack, mouseX, mouseY, false);
@@ -652,7 +792,7 @@ public final class RecipeHelper {
 
   private void inspect(GuiGraphicsExtractor g, String id, ItemStack stack, int mouseX, int mouseY,
                        boolean browsing) {
-    if (id.isBlank()) return;
+    if (!enabled() || id.isBlank()) return;
     long now = System.nanoTime();
     if (!id.equals(inspectedItem) || now - lastInspected > 500_000_000L) {
       inspectedItem = id;
@@ -807,7 +947,9 @@ public final class RecipeHelper {
     return lines;
   }
 
-  public void craftingValue(ItemStack stack, List<Component> lines) { pricing.append(key(stack), stack.getCount(), lines); }
+  public void craftingValue(ItemStack stack, List<Component> lines) {
+    if (enabled()) pricing.append(key(stack), stack.getCount(), lines);
+  }
 
   public void browserTooltip(GuiGraphicsExtractor g, String id, int x, int y, boolean controls) {
     var actual = icons.get(id);

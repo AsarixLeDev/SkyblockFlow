@@ -9,7 +9,17 @@ public final class MarketStock {
   private record Stock(long remaining, long at) {}
   private final Map<String, Stock> observed = new HashMap<>();
 
-  public void clear() { observed.clear(); }
+  private long revision;
+  public long revision() { return revision; }
+  public void clear() { observed.clear(); revision++; }
+
+  public Map<String, Long> snapshot(Market market) {
+    var copy = new HashMap<String, Long>();
+    observed.forEach((id, stock) -> {
+      if (stock.at >= market.at()) copy.put(id, stock.remaining);
+    });
+    return Map.copyOf(copy);
+  }
 
   public List<Offer> sellers(Market market, String type, String name) {
     return ExcaliaApiData.best(market.selling().getOrDefault(type, List.of()).stream()
@@ -45,8 +55,11 @@ public final class MarketStock {
     if (offer == null || offer.unlimited() || remaining < 0) return;
     var previous = observed.get(offer.identity());
     if (previous != null && previous.at > now) return;
-    if (observed.size() >= 2048 && !observed.containsKey(offer.identity())) observed.clear();
-    observed.put(offer.identity(), new Stock(Math.min(current(market, offer).stock(), remaining), now));
+    if (observed.size() >= 2048 && !observed.containsKey(offer.identity())) clear();
+    long prior = current(market, offer).stock();
+    long updated = Math.min(prior, remaining);
+    observed.put(offer.identity(), new Stock(updated, now));
+    if (updated != prior) revision++;
   }
 
   public void purchased(Market market, Offer offer, long amount, long now) {

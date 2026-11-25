@@ -269,6 +269,32 @@ public final class CelebrationService {
     return (int) (Math.clamp(amount, 0, 1) * 255) << 24 | color & 0xffffff;
   }
 
+  public boolean skipEdit() {
+    if (active == null || !active.edit.enabled) return false;
+    stop();
+    return true;
+  }
+
+  public void renderSkipHint(GuiGraphicsExtractor g) {
+    if (!visibleNow() || !active.edit.enabled) return;
+    var font = Minecraft.getInstance().font;
+    String before = "press ", key = "escape", after = " to skip";
+    int keyWidth = font.width(key) + 8;
+    int width = font.width(before) + keyWidth + font.width(after);
+    int x = Math.max(4, g.guiWidth() - width - 12), y = g.guiHeight() - 26;
+    int keyX = x + font.width(before);
+    g.text(font, before, x, y + 3, 0xffeeeeee, true);
+    // An outlined keycap leaves the world visible through the entire hint.
+    int edge = 0xcceeeeee;
+    g.fill(keyX + 2, y, keyX + keyWidth - 2, y + 1, edge);
+    g.fill(keyX, y + 2, keyX + 1, y + 12, edge);
+    g.fill(keyX + keyWidth - 1, y + 2, keyX + keyWidth, y + 12, edge);
+    g.fill(keyX + 2, y + 13, keyX + keyWidth - 2, y + 14, edge);
+    g.fill(keyX + 3, y + 15, keyX + keyWidth - 3, y + 16, 0x88eeeeee);
+    g.text(font, key, keyX + 4, y + 3, 0xffffffff, true);
+    g.text(font, after, keyX + keyWidth, y + 3, 0xffeeeeee, true);
+  }
+
   public void stop() {
     active = null;
     remote = null;

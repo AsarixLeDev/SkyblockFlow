@@ -1,0 +1,4 @@
+Type: Performance
+Author: Asarix
+Summary: Keep crafting-price work out of rendering
+Details: Build recipe indexes asynchronously, snapshot prices, match sellers in the background and reuse ingredient plans with bounded calculation work.

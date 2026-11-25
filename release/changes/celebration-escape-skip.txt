@@ -1,0 +1,4 @@
+Type: Improvement
+Author: Asarix
+Summary: Skip celebration edits with Escape
+Details: Show a transparent bottom-right hint with an outlined Escape key and stop playback through the existing cleanup path.
