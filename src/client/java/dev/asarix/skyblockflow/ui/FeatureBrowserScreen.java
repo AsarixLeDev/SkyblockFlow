@@ -60,6 +60,7 @@ public final class FeatureBrowserScreen extends FlowScreen {
       case ESPORTS -> "Rocket League";
       case COMMUNITY_NAMES -> "Community names";
       case ISLAND_FLIGHT -> "Island flight";
+      case RECIPES -> "Recipe helper";
     };
   }
 
@@ -89,6 +90,7 @@ public final class FeatureBrowserScreen extends FlowScreen {
       case ENERGY -> "Solar, batteries, nuclear fuel and machine selection.";
       case ESPORTS -> "Live Rocket League series from Liquipedia.";
       case COMMUNITY_NAMES -> "Optional SF badges, name colors, gradients and fonts in tab and chat.";
+      case RECIPES -> "Browse recipes, item details and materials. Disable the helper and all its shortcuts.";
       case ISLAND_FLIGHT -> "Use /fly enable on your island · VIP and higher · learns /is go and /is tp.";
     };
   }
@@ -129,6 +131,7 @@ public final class FeatureBrowserScreen extends FlowScreen {
           case MINERALS -> c.tools.minerals;
           case ARTISAN -> c.tools.artisan;
           case ESPORTS -> c.tools.esports;
+          case RECIPES -> c.tools.recipes.enabled;
           case ISLAND_FLIGHT -> c.tools.islandFlight.enabled && SkyblockFlowClient.INSTANCE.islandFlight.rank() != dev.asarix.skyblockflow.core.IslandFlightLogic.Rank.CITIZEN;
           default -> true;
         };
@@ -167,6 +170,7 @@ public final class FeatureBrowserScreen extends FlowScreen {
         app.waypoints.changed();
       }
 
+      case RECIPES -> app.recipes.setEnabled(on);
       case CALCULATOR -> c.tools.calculator = on;
       case SHOP_VALUES -> c.tools.shopValues = on;
       case CLOCK -> c.tools.clock = on;
@@ -198,6 +202,7 @@ public final class FeatureBrowserScreen extends FlowScreen {
           case OVERLAY -> new OverlayHub(app, this);
           case COMMUNITY_NAMES -> new PlayerNamesScreen(app, this);
           case ISLAND_FLIGHT -> new IslandFlightScreen(app, this);
+          case RECIPES -> new RecipeSettingsScreen(app, this);
           case WAYPOINTS -> new WaypointScreen(app, this);
           case SPAWNERS -> new SpawnerSettingsScreen(app, this);
           case ENERGY -> new EnergyScreen(app, this);

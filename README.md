@@ -16,6 +16,27 @@ Choose a feature to configure it. Search includes settings inside nested menus. 
 
 Download [PUBLIC-BETA-0.0.2](https://github.com/AsarixLeDev/SkyblockFlow/releases/tag/PUBLIC-BETA-0.0.2). The Discord overlay cannot connect in this release while public access is being verified. See [Discord availability](DISCORD-RELEASE.md).
 
+## Unreleased changes
+
+These source changes are not part of a new release and have not been tested (`tested=false`). The version is unchanged.
+
+- **Recipe helper:** turn the entire feature off in **Features → Recipe helper → Enable recipe helper**, or choose **Disable recipe helper** in its gear menu. This also disables its inventory browser, item inspection, materials overlay, crafting-value details and all recipe shortcuts, including R, U, P, G and C. Your pinned recipes and preferences remain saved. Re-enable it from Features.
+- **Chat tabs:** **Features → Chat alerts → Enable chat tabs** turns all tabs and their filtering off together. All messages return to one chat view. Chat alerts, copying and message compression keep their own settings.
+- **Celebration edits:** press **Escape** to stop a cinematic edit. A transparent hint with an outlined Escape key appears at the bottom right during playback.
+- **Crafting values:** recipe indexing and market-price matching now run in the background, with bounded client work and cached results. Shared ingredient calculations are reused instead of repeatedly expanding large ingredient lists. An unavailable or overly complex estimate does not display a partial price.
+
+## Player profiles
+
+Run **`/pv Asarix`** to open Asarix's profile, or use **`/pv PlayerName`** for another player. The profile brings together an overview, job progress and rankings, island details, wallet and player-shop listings, and pet information when available. Click the sidebar to explore; job cards show level progress and nearby competitors. A player-specific `/jobs stats PlayerName` also opens the jobs section.
+
+Profiles combine public Excalia API data with information you have inspected in game. Missing or unlisted data stays unavailable instead of appearing as zero. **Refresh** updates available sources; some server-only information needs an inspection while connected to Excalia.
+
+![Asarix profile overview opened with /pv Asarix](docs/screenshots/pv-asarix-overview.png)
+
+![Asarix Chasseur job details and leaderboard comparison](docs/screenshots/pv-asarix-jobs.png)
+
+These captures use the existing installed build and combine cached profile stats with public rankings. Live inspection was unavailable in the lobby, as shown in the header.
+
 ## Features
 
 | Feature | What it does |
@@ -28,7 +49,7 @@ Download [PUBLIC-BETA-0.0.2](https://github.com/AsarixLeDev/SkyblockFlow/release
 | **Waypoints and maps** | Organizes colored checkpoints into sets and categories, with labels, visibility zones, a minimap, recorded surface maps, copy/offset tools and walking/flying route guidance. [Waypoints guide](WAYPOINTS.md). |
 | **Inventory calculator** | A compact arithmetic bar in inventories and containers, with parentheses, decimal calculations, a scrolling expression and a result that fits the bar. |
 | **Farm sack badges** | A small item icon in the sack’s upper-right corner shows its filter in inventories, containers and the hotbar. |
-| **Recipe helper** | Browse and search items beside your inventory. Check recipes and uses, pin favorites, and scroll the materials checklist inside your inventory. Missing ingredients come first; materials you already have appear last in every checklist. Item hover tooltips include known lore, shop prices and player-market offers. The Buy view shows where an item can be purchased, with unit prices and island sellers. Long tooltips wrap and scroll with the mouse wheel. Craft fills the appropriate table; Shift-click fills the maximum available amount. Matching Excalia search results are selected for you after you click Craft. |
+| **Recipe helper** | Can be fully disabled, including its shortcuts. Browse and search items beside your inventory. Check recipes and uses, pin favorites, and scroll the materials checklist inside your inventory. Missing ingredients come first; materials you already have appear last in every checklist. Item hover tooltips include known lore, shop prices and player-market offers. The Buy view shows where an item can be purchased, with unit prices and island sellers. Long tooltips wrap and scroll with the mouse wheel. Craft fills the appropriate table; Shift-click fills the maximum available amount. Matching Excalia search results are selected for you after you click Craft. |
 | **Shop values** | Shows current server-shop prices with job-adjusted unit and stack values, plus the cheapest player-shop seller and highest buyer with merchant names. Sold-out offers are excluded and totals respect listed stock. |
 | **Crafting value** | Shows the cheapest known ingredient cost per item and stack, comparing raw materials, intermediates and compacted forms. Buying the finished item does not lower its crafting value. Hold C (rebindable in Controls) to see ingredient icons, quantities and costs. |
 | **Island flight** | Learns your island after `/is go` or `/is tp`, then enables available flight on confirmed arrivals. Requires VIP or higher, checks rank in tab, and keeps already enabled flight on. Island bounds and server identification are saved per account. |
@@ -40,7 +61,7 @@ Download [PUBLIC-BETA-0.0.2](https://github.com/AsarixLeDev/SkyblockFlow/release
 | **Chat alerts and tools** | Configurable template/regex message alerts, sound/title choices, clickable chat copying, repeated-message compression across the last five minutes, and command shortcuts that run only during gameplay. Default alerts cover skill availability, private messages and pet hunger. |
 | **Coordinate sounds** | User-created alerts when entering an area. No personal coordinates are bundled. |
 | **Timers and alarms** | One-shot or repeating timers, hungry-pet and rank alerts, optional ancient-debris and rocket-oxygen warnings, with configurable presentation and sound. |
-| **Celebrations and edits** | Level-up cards, fireworks and optional cinematic camera effects, grading, fades and bass-reactive motion. Import your own MP3/PNG, edit hit timelines and save presets. No music is included. |
+| **Celebrations and edits** | Level-up cards, fireworks and optional cinematic camera effects, grading, fades and bass-reactive motion. Import your own MP3/PNG, edit hit timelines and save presets. Press Escape to skip cinematic edits; a small key hint appears during playback. No music is included. |
 | **Shared edits** | Send an invitation to watch an edit together, including an optional terrain scene or staged avatar. The recipient accepts before download/playback. Blocking, cancellation, a completion cooldown and temporary media cleanup are built in. |
 | **Spotify overlay** | Optional local desktop track metadata, cover art and playback progress. Requires a supported running desktop player. |
 | **Discord overlay (pending availability)** | Connection is disabled in this beta. When available, the integration displays voice-call members, speaking/mute status and an unread badge. Browser approval uses the publisher app. Voice controls require separate opt-in. |
@@ -69,7 +90,7 @@ Excalia Season 3's public API supplies published job rankings (including fishing
 
 **Market buy** is the lowest available selling price; **Market sell** is the highest available buyback price. Quotes show the merchant, unit price and available stack total. The API does not provide shop coordinates or island IDs, and prices or stock may change before you arrive. Ambiguous item variants are omitted.
 
-The **mp** chat tab contains incoming private messages and replies, using your **mp / Message privé** alert pattern independently of whether its alarm is enabled. Public messages and notices stay available in the other tabs.
+Tabs can be disabled together in **Features → Chat alerts → Enable chat tabs**. The **mp** chat tab contains incoming private messages and replies, using your **mp / Message privé** alert pattern independently of whether its alarm is enabled. Public messages and notices stay available in the other tabs.
 
 ![Manual leaderboard command](docs/screenshots/leaderboards.png)
 
@@ -91,6 +112,7 @@ The relay removes shared media on completion/cancellation and expires abandoned 
 | --- | --- |
 | `/skyblockflow` / **F7** | Feature browser |
 | `/jobs stats` | Jobs dashboard, when enabled |
+| `/pv PlayerName` | Player profile with jobs, island, wallet, shops and pets |
 | `/waypoints` | Waypoint sets, maps and routes |
 | `/skyblockflowartisan` | Artisan estimate |
 | `/skyblockflowenergy` | Saved energy plan |
@@ -122,6 +144,6 @@ On Windows use `gradlew.bat build`. The mod and source JARs are written to `buil
 - [Issues](https://github.com/AsarixLeDev/SkyblockFlow/issues)
 - [MIT license](LICENSE) and [third-party notices](third-party/NOTICE.txt)
 
-Screenshots show the actual mod in a local demonstration world with sample job data. No player chats, Discord contacts or server coordinates are included.
+The other feature screenshots show the mod in a local demonstration world with sample job data. The player-profile captures above show Asarix’s existing profile. No chat conversations or Discord contacts are included.
 
 SkyblockFlow is a community project, not an official Minecraft or Excalia product.

@@ -33,6 +33,7 @@ public final class SettingSearchScreen extends FlowScreen {
   private List<Route> routes() {
     var routes = new ArrayList<Route>();
     routes.add(new Route("Community names / tab / chat / colors / gradients / fonts", p -> new PlayerNamesScreen(app, p)));
+    routes.add(new Route("Recipe helper / enable / disable / shortcuts / materials", p -> new RecipeSettingsScreen(app, p)));
     routes.add(new Route("General", p -> new GeneralSettingsScreen(app, p)));
     routes.add(new Route("Jobs", p -> new JobSettingsScreen(app, p)));
     routes.add(

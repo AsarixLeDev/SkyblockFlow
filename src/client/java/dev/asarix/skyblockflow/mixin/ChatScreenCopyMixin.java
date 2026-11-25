@@ -21,6 +21,11 @@ public abstract class ChatScreenCopyMixin {
 
   @Inject(method = "extractRenderState", at = @At("TAIL"))
   private void skyblockflow$tabs(GuiGraphicsExtractor graphics, int mouseX, int mouseY, float delta, CallbackInfo ci) {
+    if (!ChatTabAccess.enabled()) {
+      skyblockflow$selected = ChatTabAccess.Tab.ALL;
+      ((ChatTabAccess) Minecraft.getInstance().gui.hud.getChat()).skyblockflow$tab(ChatTabAccess.Tab.ALL);
+      return;
+    }
     int x = 6;
     for (var tab : ChatTabAccess.Tab.values()) {
       boolean selected = tab == skyblockflow$selected;
@@ -39,7 +44,7 @@ public abstract class ChatScreenCopyMixin {
   @Inject(method = "mouseClicked", at = @At("HEAD"), cancellable = true)
   private void skyblockflow$copy(
       MouseButtonEvent event, boolean twice, CallbackInfoReturnable<Boolean> ci) {
-    if (event.button() == 0 && event.y() >= 5 && event.y() < 19
+    if (ChatTabAccess.enabled() && event.button() == 0 && event.y() >= 5 && event.y() < 19
         && event.x() >= 6 && event.x() < 6 + ChatTabAccess.Tab.values().length * 50 && (event.x() - 6) % 50 < 48) {
       skyblockflow$selected = ChatTabAccess.Tab.values()[(int) (event.x() - 6) / 50];
       ((ChatTabAccess) Minecraft.getInstance().gui.hud.getChat()).skyblockflow$tab(skyblockflow$selected);

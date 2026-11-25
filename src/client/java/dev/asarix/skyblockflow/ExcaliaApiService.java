@@ -118,6 +118,30 @@ public final class ExcaliaApiService {
     var snapshot = usable(Feed.ECONOMY);
     return snapshot == null ? List.of() : ((Economy)snapshot.data()).prices().getOrDefault(item, List.of());
   }
+  private ExcaliaApiClient.Snapshot pricingEconomy, pricingMarket;
+  private long pricingStockRevision, pricingRevision;
+  private CraftingPrices craftingPrices = new CraftingPrices(0, null, null, Map.of());
+
+  record CraftingPrices(long revision, Economy economy, Market market, Map<String, Long> stock) {}
+
+  // Captured on the client thread; calculation workers only read this immutable snapshot.
+  CraftingPrices craftingPrices() {
+    boolean online = connected();
+    var economy = online && settings().shopPrices ? usable(Feed.ECONOMY) : null;
+    var market = online && settings().market ? usable(Feed.MARKET) : null;
+    long stock = market == null ? 0 : marketStock.revision();
+    if (economy != pricingEconomy || market != pricingMarket || stock != pricingStockRevision) {
+      pricingEconomy = economy;
+      pricingMarket = market;
+      pricingStockRevision = stock;
+      var marketData = market == null ? null : (Market) market.data();
+      craftingPrices = new CraftingPrices(++pricingRevision,
+          economy == null ? null : (Economy) economy.data(), marketData,
+          marketData == null ? Map.of() : marketStock.snapshot(marketData));
+    }
+    return craftingPrices;
+  }
+
   public String priceSource(String shop) {
     var snapshot = usable(Feed.ECONOMY);
     boolean cached = snapshot != null && System.currentTimeMillis() - snapshot.receivedAt() > Feed.ECONOMY.ttl * 2;

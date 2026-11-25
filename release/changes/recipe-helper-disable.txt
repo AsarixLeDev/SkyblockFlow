@@ -1,0 +1,4 @@
+Type: Feature
+Author: Asarix
+Summary: Disable the complete recipe helper
+Details: One switch disables the browser, inspection, materials, crafting details and all recipe shortcuts while preserving saved preferences.

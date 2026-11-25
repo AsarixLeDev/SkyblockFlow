@@ -108,6 +108,7 @@ public final class InventoryRecipeDock {
   private final RecipeBookComponent<?> vanillaBook;
   private List<ItemTile> items = List.of(), pins = List.of(), filteredPins = List.of();
   private RecipeCatalog catalog;
+  private long itemIndexRevision;
   private Language language;
   private ItemTile hover;
   private long transitionAt;
@@ -137,17 +138,18 @@ public final class InventoryRecipeDock {
   }
 
   public static void attach(RecipeHelper helper, AbstractContainerScreen<?> screen, State state) {
+    if (!helper.enabled()) return;
     var dock = new InventoryRecipeDock(helper, screen, state);
     ScreenEvents.afterForeground(screen).register((s, g, mx, my, dt) -> dock.render(g, mx, my, dt));
     ScreenMouseEvents.allowMouseClick(screen).register((s, e) -> dock.allowClick(e));
     ScreenMouseEvents.allowMouseRelease(screen).register((s, e) -> dock.allowRelease(e));
     ScreenMouseEvents.allowMouseDrag(screen)
-        .register((s, e, dx, dy) -> (dock.ownedButtons & 1 << e.button()) == 0);
+        .register((s, e, dx, dy) -> !helper.enabled() || (dock.ownedButtons & 1 << e.button()) == 0);
     ScreenMouseEvents.allowMouseScroll(screen)
         .register((s, mx, my, dx, dy) -> dock.allowScroll(mx, my, dy));
     ScreenKeyboardEvents.allowKeyPress(screen).register((s, e) -> dock.allowKey(e));
     ScreenKeyboardEvents.allowCharType(screen).register((s, e) -> {
-      if (!dock.search.isFocused()) return true;
+      if (!helper.enabled() || !dock.search.isFocused()) return true;
       dock.search.charTyped(e);
       return false;
     });
@@ -295,6 +297,7 @@ public final class InventoryRecipeDock {
 
   private void refresh() {
     catalog = helper.catalog();
+    itemIndexRevision = helper.itemIndexRevision();
     language = Language.getInstance();
     items = helper.items(state.query, false);
     pins = helper.items("", true);
@@ -361,6 +364,7 @@ public final class InventoryRecipeDock {
   }
 
   private boolean allowClick(MouseButtonEvent event) {
+    if (!helper.enabled()) { search.setFocused(false); ownedButtons = 0; return true; }
     Layout l = layout();
     Browser browser = l.browser;
     double x = event.x(), y = event.y();
@@ -378,7 +382,7 @@ public final class InventoryRecipeDock {
       return false;
     }
     if (target == 0 || transitionAt != 0 || !screen.getMenu().getCarried().isEmpty()) return false;
-    if (catalog != helper.catalog() || language != Language.getInstance()) refresh();
+    if (catalog != helper.catalog() || language != Language.getInstance() || itemIndexRevision != helper.itemIndexRevision()) refresh();
     clampPages(l);
     screen.setFocused(null);
     for (var child : screen.children()) {
@@ -412,6 +416,7 @@ public final class InventoryRecipeDock {
   }
 
   private boolean allowRelease(MouseButtonEvent event) {
+    if (!helper.enabled()) { search.setFocused(false); ownedButtons = 0; return true; }
     int mask = 1 << event.button();
     if ((ownedButtons & mask) != 0) {
       ownedButtons &= ~mask;
@@ -432,6 +437,7 @@ public final class InventoryRecipeDock {
   }
 
   private boolean allowScroll(double x, double y, double amount) {
+    if (!helper.enabled()) { search.setFocused(false); ownedButtons = 0; return true; }
     Layout l = layout();
     if (l.checklist != null && l.checklist.contains(x, y)) {
       syncChecklist(l.checklist);
@@ -449,6 +455,7 @@ public final class InventoryRecipeDock {
   }
 
   private boolean allowKey(KeyEvent event) {
+    if (!helper.enabled()) { search.setFocused(false); ownedButtons = 0; return true; }
     if (search.isFocused()) {
       if (event.key() == GLFW.GLFW_KEY_ESCAPE) search.setFocused(false);
       else if (event.key() == GLFW.GLFW_KEY_ENTER || event.key() == GLFW.GLFW_KEY_KP_ENTER) {
@@ -482,6 +489,7 @@ public final class InventoryRecipeDock {
   }
 
   private void render(GuiGraphicsExtractor g, int mx, int my, float dt) {
+    if (!helper.enabled()) { hover = null; search.setFocused(false); ownedButtons = 0; return; }
     Layout l = layout();
     Browser browser = l.browser;
     hover = null;
@@ -500,7 +508,7 @@ public final class InventoryRecipeDock {
     boolean canHover = transitionAt == 0 && target > 0 && screen.getMenu().getCarried().isEmpty();
     int hx = canHover ? mx : -1, hy = canHover ? my : -1;
     if (progress > 0) {
-      if (catalog != helper.catalog() || language != Language.getInstance()) refresh();
+      if (catalog != helper.catalog() || language != Language.getInstance() || itemIndexRevision != helper.itemIndexRevision()) refresh();
       clampPages(l);
       beginSlide(g, browser.grid.area, browser.edge, progress);
       renderGrid(g, browser.grid, results(l), state.itemPage, true, hx, hy);

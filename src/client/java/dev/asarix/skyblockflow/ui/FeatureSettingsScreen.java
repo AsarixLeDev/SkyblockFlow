@@ -33,6 +33,8 @@ public final class FeatureSettingsScreen extends FormScreen {
     }
     switch (feature) {
       case CHAT -> {
+        toggle("Enable chat tabs", draft.chatTabs, y, () -> draft.chatTabs = !draft.chatTabs);
+        y += 34;
         toggle(
             "Ctrl + left-click chat to copy",
             draft.copyChatOnClick,
@@ -83,6 +85,11 @@ public final class FeatureSettingsScreen extends FormScreen {
   protected void commit() {
     switch (feature) {
       case CHAT -> {
+        if (app.store.config.chatTabs != draft.chatTabs) {
+          app.store.config.chatTabs = draft.chatTabs;
+          ((dev.asarix.skyblockflow.ChatTabAccess) minecraft.gui.hud.getChat()).skyblockflow$tab(dev.asarix.skyblockflow.ChatTabAccess.Tab.ALL);
+          minecraft.gui.hud.getChat().rescaleChat();
+        }
         app.store.config.copyChatOnClick = draft.copyChatOnClick;
         if (app.store.config.compactChat != draft.compactChat) {
           app.store.config.compactChat = draft.compactChat;

@@ -28,6 +28,7 @@ public abstract class CelebrationHudMixin {
     if (app != null && app.celebrations != null) {
       graphics.nextStratum();
       app.celebrations.render(graphics);
+      app.celebrations.renderSkipHint(graphics);
     }
   }
 }
