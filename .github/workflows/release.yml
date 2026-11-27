@@ -46,4 +46,8 @@ jobs:
           sha256sum "$jar" > ../release/SHA256SUMS
           (cd ../release && sha256sum CHANGE_DETAILS.txt >> SHA256SUMS)
           title=$(sed -n '1s/^# //p' ../release/RELEASE_NOTES.md)
-          gh release create "$GITHUB_REF_NAME" --verify-tag "${flags[@]}" --title "$title" --notes-file ../release/RELEASE_NOTES.md "$jar" ../release/SHA256SUMS ../release/CHANGE_DETAILS.txt
+          if gh release view "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo "Release already exists; keeping its assets until an explicit manual revision."
+          else
+            gh release create "$GITHUB_REF_NAME" --verify-tag "${flags[@]}" --title "$title" --notes-file ../release/RELEASE_NOTES.md "$jar" ../release/SHA256SUMS ../release/CHANGE_DETAILS.txt
+          fi

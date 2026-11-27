@@ -1,0 +1,4 @@
+Type: Refactor
+Author: Asarix
+Summary: Keep untested beta revisions explicit.
+Details: Record a revision number and a download-and-replace notice when revising an existing untested beta. Existing release assets are never overwritten automatically by a workflow rerun.

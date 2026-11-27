@@ -33,6 +33,11 @@ def main():
         require(len(hits) == 1, f"Supply one developer Flow-{field} trailer.")
         values.append(hits[0])
     version, tested, mode = values
+    revisions = re.findall(r"^Flow-Revision: (\d+)$", msg, re.M)
+    require(len(revisions) <= 1, "Supply at most one Flow-Revision trailer")
+    revision = int(revisions[0]) if revisions else None
+    require(revision is None or revision >= 2 and mode == "beta" and tested == "no",
+            "In-place revisions are limited to explicitly requested untested betas")
     require(tested in ("yes", "no") and mode in ("dev", "public", "beta"), "Invalid declaration")
     require(re.fullmatch(r"(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)" + ("" if mode == "public" else r"\.(?:0|[1-9]\d*)"), version), "Invalid version")
     expected = version + {"dev":"-dev", "beta":"-beta", "public":""}[mode]
@@ -68,6 +73,8 @@ def main():
         notes = ["# " + title, ""]
         if tested == "no":
             notes.extend(["> Untested beta (tested=no). In-game verification is still pending.", ""])
+        if revision is not None:
+            notes.extend([f"> Revision {revision}: if you installed an earlier {version} Beta, download and replace the JAR; the version number is unchanged.", ""])
         details = ["Format: 1",""]
         for f in selected:
             kind, author, summary, _ = records[f]

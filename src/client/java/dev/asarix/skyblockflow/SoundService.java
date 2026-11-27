@@ -46,6 +46,8 @@ public final class SoundService implements AutoCloseable {
   private Future<?> pending;
   private SimpleSoundInstance vanilla;
   private final List<SimpleSoundInstance> alarmVanilla = new ArrayList<>();
+  private final List<SimpleSoundInstance> notifications = new ArrayList<>();
+  private static final int MAX_NOTIFICATIONS = 8;
   private volatile boolean alarmActive;
   private SoundService preview;
   private BassAnalyzer reactiveBass;
@@ -153,6 +155,14 @@ public final class SoundService implements AutoCloseable {
   }
 
   public synchronized void stop() {
+    stopPlayback();
+    var manager = Minecraft.getInstance().getSoundManager();
+    for (var sound : notifications) manager.stop(sound);
+    notifications.clear();
+    if (preview != null) preview.stop();
+  }
+
+  private synchronized void stopPlayback() {
     generation.incrementAndGet();
     if (reactiveBass != null) {
       reactiveBass.cancelPlayback();
@@ -194,6 +204,11 @@ public final class SoundService implements AutoCloseable {
   public void playAlert(SoundSettings rule, AlarmKind kind) {
     if (kind != AlarmKind.TIMER && kind != AlarmKind.LEVEL_UP && !app.alertsAllowed()) return;
     boolean looping = false;
+    if (!looping && (rule.soundKind == SoundKind.SILENT || rule.volume <= 0)) return;
+    if (!looping && rule.soundKind == SoundKind.VANILLA) {
+      playNotification(rule);
+      return;
+    }
     if (alarmActive && !looping) play(rule);
     else play(rule, looping);
   }
@@ -212,7 +227,7 @@ public final class SoundService implements AutoCloseable {
     return () -> {
       synchronized (owner) {
         // Cancel only this playback, never a later song.
-        if (!looping && owner.generation.get() == ticket) owner.stop();
+        if (!looping && owner.generation.get() == ticket) owner.stopPlayback();
       }
     };
   }
@@ -231,7 +246,7 @@ public final class SoundService implements AutoCloseable {
 
   private void play(
       SoundSettings rule, boolean looping, CelebrationEditSettings edit, BassAnalyzer bass) {
-    stop();
+    stopPlayback();
     reactiveBass = bass;
     int repetitions = 1;
     Minecraft mc = Minecraft.getInstance();
@@ -455,6 +470,24 @@ public final class SoundService implements AutoCloseable {
                 }
               }
             });
+  }
+
+  private void playNotification(SoundSettings rule) {
+    var manager = Minecraft.getInstance().getSoundManager();
+    var id = Identifier.tryParse(rule.sound);
+    if (id == null || !playable(manager.getSoundEvent(id))) {
+      app.error("Alert sound is unavailable: " + rule.sound);
+      return;
+    }
+    notifications.removeIf(sound -> !manager.isActive(sound));
+    // Notification voices are independent of previews and celebration playback.
+    // Bound concurrent voices if a burst of many different rules fires at once.
+    if (notifications.size() >= MAX_NOTIFICATIONS) manager.stop(notifications.removeFirst());
+    var sound = new SimpleSoundInstance(id, SoundSource.UI, rule.volume, rule.pitch,
+        SoundInstance.createUnseededRandom(), false, 0, SoundInstance.Attenuation.NONE, 0, 0, 0, true);
+    if (manager.play(sound) == net.minecraft.client.sounds.SoundEngine.PlayResult.STARTED)
+      notifications.add(sound);
+    else app.error("Alert sound could not start. Check Minecraft's Master and UI volume and sound device.");
   }
 
   private void playMinecraftVanilla(Minecraft mc, Identifier id, float volume, float pitch) {

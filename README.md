@@ -18,7 +18,9 @@ Download [0.0.3 Beta](https://github.com/AsarixLeDev/SkyblockFlow/releases/tag/S
 
 ## 0.0.3 Beta
 
-This prerelease is marked **untested (`tested=no`)**. In-game verification is pending.
+This prerelease is marked **untested (`tested=no`)**. Player verification is pending.
+
+**Revised 27 November 2026:** selected Minecraft alert sounds can now finish when another notification arrives. If you installed the earlier 0.0.3 Beta, download the JAR again and replace it; the version number is unchanged.
 
 - **Ability-ready alerts:** recognize decorative lettering and spacing in messages such as “ABATTEUR 2 EST À NOUVEAU DISPONIBLE.”, including copied default rules.
 - **Chat alerts:** opening them from Alarms leads to the same settings as the feature browser.

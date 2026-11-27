@@ -1,0 +1,4 @@
+Type: Fix
+Author: Asarix
+Summary: Keep selected Minecraft alert sounds from being cut off by other notifications.
+Details: Notification sounds use independent bounded voices. Silent or muted alerts do not stop them, and ending a preview or celebration leaves them playing. Disconnecting still stops all notification audio. This corrects missing sound after the alert itself was already displayed.
