@@ -1,0 +1,4 @@
+Type: Refactor
+Author: Asarix
+Summary: Support explicitly requested untested beta prereleases.
+Details: Untested beta tags stay on their feature branch and their release notes show tested=no. Main and public releases still require tested=yes.

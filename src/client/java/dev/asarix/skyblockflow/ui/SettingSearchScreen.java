@@ -33,7 +33,7 @@ public final class SettingSearchScreen extends FlowScreen {
   private List<Route> routes() {
     var routes = new ArrayList<Route>();
     routes.add(new Route("Community names / tab / chat / colors / gradients / fonts", p -> new PlayerNamesScreen(app, p)));
-    routes.add(new Route("Recipe helper / enable / disable / shortcuts / materials", p -> new RecipeSettingsScreen(app, p)));
+    routes.add(new Route("Recipe helper / enable / disable / shortcuts / materials / sacks / icons", p -> new RecipeSettingsScreen(app, p)));
     routes.add(new Route("General", p -> new GeneralSettingsScreen(app, p)));
     routes.add(new Route("Jobs", p -> new JobSettingsScreen(app, p)));
     routes.add(
@@ -65,7 +65,7 @@ public final class SettingSearchScreen extends FlowScreen {
     for (var panel : HudSettings.Panel.values())
       routes.add(new Route("Overlays / " + panel.title, p -> new HudOptions(app, p, panel)));
     for (var kind : AlarmKind.values())
-      routes.add(new Route("Alarms / " + kind.label, p -> new AlarmHub.Editor(app, p, kind)));
+      routes.add(new Route("Alarms / " + kind.label, p -> AlarmHub.settings(app, p, kind)));
     for (String tool :
         List.of(
             "Calculator",

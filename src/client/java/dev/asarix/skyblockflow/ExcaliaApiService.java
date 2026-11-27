@@ -20,6 +20,7 @@ public final class ExcaliaApiService {
   private long nextTick;
   private final EnumMap<Feed,ExcaliaApiClient.Snapshot> ownProgress = new EnumMap<>(Feed.class);
   private final MarketStock marketStock = new MarketStock();
+  private final MarketQuotes marketQuotes = new MarketQuotes();
   private final MarketMessages marketMessages = new MarketMessages();
   private final MarketSignObserver marketSigns = new MarketSignObserver();
   private Object marketLevel;
@@ -45,7 +46,7 @@ public final class ExcaliaApiService {
           .executes(ctx -> openProfile(com.mojang.brigadier.arguments.StringArgumentType.getString(ctx,"player")))));
     });
     ClientTickEvents.END_CLIENT_TICK.register(mc -> {tick(); inspections.tick();});
-    ClientLifecycleEvents.CLIENT_STOPPING.register(mc -> {client.close(); inspections.close();});
+    ClientLifecycleEvents.CLIENT_STOPPING.register(mc -> {client.close(); inspections.close(); marketQuotes.close();});
     net.fabricmc.fabric.api.client.message.v1.ClientReceiveMessageEvents.GAME.register((text, overlay) -> {
       if (overlay || !connected() || !settings().market) return;
       var snapshot = usable(Feed.MARKET);
@@ -54,7 +55,7 @@ public final class ExcaliaApiService {
       for (String line : text.getString().split("\\n")) marketMessages.accept(line, market, marketStock, now);
     });
     net.fabricmc.fabric.api.client.networking.v1.ClientPlayConnectionEvents.DISCONNECT.register((handler, mc) -> {
-      inspections.disconnect(); marketStock.clear(); marketMessages.reset(); marketSigns.reset(); marketLevel = null;
+      inspections.disconnect(); marketQuotes.clear(); marketStock.clear(); marketMessages.reset(); marketSigns.reset(); marketLevel = null;
     });
   }
   public List<String> profileSuggestions(String prefix){
@@ -94,7 +95,13 @@ public final class ExcaliaApiService {
   }
   public void refreshRankings() {
     if (!rankingsEnabled()) return;
-    client.request(Feed.JOBS); client.request(Feed.FISHING); client.request(Feed.ISLANDS); client.request(Feed.MONEY);
+    requestJobRanking(Feed.JOBS); requestJobRanking(Feed.FISHING); client.request(Feed.ISLANDS); client.request(Feed.MONEY);
+  }
+  private void requestJobRanking(Feed feed) {
+    var active = app.jobs.tracker.activeJob();
+    if (app.store.config.enabled(Feature.JOBS) && settings().refreshActiveJob
+        && active != null && feed == jobFeed(active.id)) client.refresh(feed, settings().activeJobIntervalMs());
+    else client.request(feed);
   }
   public String refreshPrices() {
     if (!connected()) return "Join Excalia Season 3 to refresh prices";
@@ -152,7 +159,10 @@ public final class ExcaliaApiService {
     var snapshot = usable(Feed.MARKET);
     if (snapshot == null) return List.of();
     var market = (Market)snapshot.data();
-    var lines = marketStock.lines(market, item, name, count);
+    var prices = craftingPrices();
+    var quotes = marketQuotes.get(market, prices.stock(), prices.revision(), item, name);
+    if (quotes == null) return List.of();
+    var lines = quotes.lines(count);
     if (System.currentTimeMillis() - market.at() > 120_000)
       return lines.stream().map(s -> s + " · cached quote").toList();
     return lines;
@@ -160,7 +170,10 @@ public final class ExcaliaApiService {
   public List<Offer> sellers(String item, String name) {
     if (!connected() || !settings().market) return List.of();
     var snapshot = usable(Feed.MARKET);
-    return snapshot == null ? List.of() : marketStock.sellers((Market)snapshot.data(), item, name);
+    if (snapshot == null) return List.of();
+    var prices = craftingPrices();
+    var quotes = marketQuotes.get((Market)snapshot.data(), prices.stock(), prices.revision(), item, name);
+    return quotes == null ? List.of() : quotes.sellers();
   }
   public void refresh(Feed feed){if(connected())client.refresh(feed);}
   public void refreshIsland(UUID id){if(connected() && id!=null)client.refreshDetail(id);}
@@ -229,7 +242,7 @@ public final class ExcaliaApiService {
     nextTick = now + 1000;
     if (rankingsEnabled()) { refreshRankings(); applyRankings(); }
     else if (settings().leaderboards && app.store.config.enabled(Feature.JOBS)) {
-      client.request(Feed.JOBS); client.request(Feed.FISHING);
+      requestJobRanking(Feed.JOBS); requestJobRanking(Feed.FISHING);
     }
     if (settings().leaderboards && app.store.config.enabled(Feature.JOBS)) {
       for (Feed feed : List.of(Feed.JOBS,Feed.FISHING)) {

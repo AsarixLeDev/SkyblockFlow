@@ -33,13 +33,18 @@ public final class AlarmHub extends FormScreen {
           i % cols * (w + 6),
           i / cols * 30,
           w,
-          () -> minecraft.gui.setScreen(new Editor(app, this, kind)));
+          () -> minecraft.gui.setScreen(settings(app, this, kind)));
       i++;
     }
   }
 
   protected void commit() {
     onClose();
+  }
+
+  static FormScreen settings(SkyblockFlowClient app, Screen parent, AlarmKind kind) {
+    return kind == AlarmKind.CHAT ? new FeatureSettingsScreen(app, parent, Feature.CHAT)
+        : new Editor(app, parent, kind);
   }
 
   static final class Editor extends FormScreen {

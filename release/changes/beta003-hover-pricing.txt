@@ -1,0 +1,4 @@
+Type: Performance
+Author: Asarix
+Summary: Keep market selection and crafting-price preparation off the game thread.
+Details: Cache bounded background market lookups, invalidate them when prices or observed stock change, and resolve ingredient names on the calculation worker. A short hover delay avoids repeated calculations while crossing items.

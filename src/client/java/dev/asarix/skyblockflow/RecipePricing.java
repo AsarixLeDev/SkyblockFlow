@@ -20,7 +20,6 @@ final class RecipePricing {
   private final SeasonThreeCatalog.Data season = SeasonThreeCatalog.load();
   private final KeyMapping details;
   private static final int CACHE_LIMIT = 128;
-  private static final long CLIENT_LOOKUP_BUDGET_NS = 1_000_000L;
   private final ExecutorService worker = Executors.newSingleThreadExecutor(task -> {
     var thread = new Thread(task, "Flow crafting prices");
     thread.setDaemon(true); thread.setPriority(Thread.MIN_PRIORITY); return thread;
@@ -29,7 +28,8 @@ final class RecipePricing {
   private RecipeCatalog catalog;
   private Language language;
   private long revision;
-  private String requested;
+  private String requested, hovered;
+  private long hoverSince;
   private Job active;
 
   private record Quote(BigDecimal unit, List<Component> details) {}
@@ -37,9 +37,6 @@ final class RecipePricing {
   private static final class Job {
     final String item;
     final Future<Set<String>> inputs;
-    Iterator<String> remaining;
-    Set<String> reachable;
-    final Map<String, String> names = new HashMap<>();
     Future<Optional<Quote>> result;
 
     Job(String item, Future<Set<String>> inputs) {
@@ -93,6 +90,7 @@ final class RecipePricing {
     }
     active = null;
     requested = null;
+    hovered = null;
     catalog = null;
     language = null;
     cache.clear();
@@ -135,26 +133,15 @@ final class RecipePricing {
       failed(job.inputs.exceptionNow());
       return;
     }
-    if (job.remaining == null) {
-      job.reachable = job.inputs.resultNow();
-      job.remaining = job.reachable.iterator();
-    }
     if (job.result == null) {
-      // Only localized names touch Minecraft here. Offer filtering and arithmetic stay on the worker.
-      long start = System.nanoTime();
-      for (int i = 0; i < 32 && job.remaining.hasNext(); i++) {
-        String id = job.remaining.next();
-        job.names.put(id, helper.name(id));
-        if (System.nanoTime() - start >= CLIENT_LOOKUP_BUDGET_NS) break;
-      }
-      if (job.remaining.hasNext()) return;
-      var names = Map.copyOf(job.names);
-      job.result = worker.submit(() -> CraftingValue.calculate(current, job.item, job.reachable,
-          id -> buy(id, names.getOrDefault(id, id), snapshot)).map(value -> {
+      var reachable = job.inputs.resultNow();
+      var names = helper.pricingNames();
+      job.result = worker.submit(() -> CraftingValue.calculate(current, job.item, reachable,
+          id -> buy(id, names.apply(id), snapshot)).map(value -> {
             var rows = new ArrayList<Component>();
             for (var part : value.parts()) {
               if (Thread.currentThread().isInterrupted()) throw new CancellationException();
-              String row = quantity(part.amount()) + " × " + names.getOrDefault(part.item(), part.item()) + " · " + money(part.cost()) + " $";
+              String row = quantity(part.amount()) + " × " + names.apply(part.item()) + " · " + money(part.cost()) + " $";
               rows.add(Component.literal(row).withColor(FlowScreen.TEXT)
                   .withStyle(style -> style.withInsertion(CraftingPriceTooltip.PREFIX + part.item())));
             }
@@ -184,10 +171,13 @@ final class RecipePricing {
   void append(String id, int count, List<Component> lines) {
     if (!enabled() || lines.stream().anyMatch(l -> l.getString().startsWith("Crafting value:"))) return;
     id = helper.recipeLookup(id);
+    long now = System.nanoTime();
+    if (!id.equals(hovered)) { hovered = id; hoverSince = now; }
+
     var ready = helper.readyCatalog();
     if (ready != null && ready.produces(id).isEmpty()) return;
     var cached = ready != null && ready == catalog ? cache.get(id) : null;
-    if (cached == null || requested == null) requested = id;
+    if (now - hoverSince >= 150_000_000L) requested = id;
     if (cached == null) {
       lines.add(Component.literal("Crafting value: calculating…").withColor(FlowScreen.MUTED));
       return;

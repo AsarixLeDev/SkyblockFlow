@@ -6,6 +6,7 @@ import java.util.Set;
 public final class RecipeSettings {
   public enum Inspection { RECIPE_HELPER, EVERYWHERE, OFF }
   public boolean enabled = true;
+  public boolean sackIcons = true;
   public Inspection inspection = Inspection.RECIPE_HELPER;
   public Set<String> pins = new LinkedHashSet<>();
   public boolean includeContainer, showChecklist, inventoryDockHidden, hideBackgroundOverlays;

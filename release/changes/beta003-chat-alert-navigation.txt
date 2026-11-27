@@ -1,0 +1,4 @@
+Type: Fix
+Author: Asarix
+Summary: Open the original Chat alerts settings from Alarms.
+Details: The alarm hub and settings search use the same chat-alert settings screen as the feature browser.

@@ -16,8 +16,8 @@ public final class AlertPattern {
     if (rule.pattern.length() > 2048) throw new IllegalArgumentException("Pattern is too long");
     String source = rule.pattern;
     skillReady = rule.mode == MatchMode.TEMPLATE
-        && DefaultChatAlerts.SKILL_READY_ID.equals(rule.id)
-        && DefaultChatAlerts.SKILL_READY_PATTERN.equals(source);
+        && DefaultChatAlerts.SKILL_READY_PATTERN.equalsIgnoreCase(normalizeReady(source));
+    if (skillReady) source = DefaultChatAlerts.SKILL_READY_PATTERN;
     if (rule.mode == MatchMode.TEMPLATE) {
       StringBuilder out = new StringBuilder("^");
       Matcher tokens = TOKEN.matcher(source);
@@ -44,7 +44,7 @@ public final class AlertPattern {
 
   public Map<String, String> match(String message, String sender) {
     if (message.length() > 4096) return null;
-    String input = skillReady ? ServerText.regularLetters(message).strip() : message;
+    String input = skillReady ? normalizeReady(message) : message;
     Matcher m = pattern.matcher(new BudgetText(input));
     if (!m.find()) return null;
     Map<String, String> vars = new LinkedHashMap<>();
@@ -55,6 +55,12 @@ public final class AlertPattern {
     vars.put("sender", sender == null || sender.isBlank() ? "Unknown sender" : sender);
     vars.put("message", message);
     return vars;
+  }
+
+  private static String normalizeReady(String message) {
+    return java.text.Normalizer.normalize(ServerText.regularLetters(message), java.text.Normalizer.Form.NFC)
+        .replaceAll("§[0-9a-fk-orA-FK-OR]", "").replaceAll("\\p{Cf}", "")
+        .replaceAll("\\s+", " ").strip();
   }
 
   public static String render(String text, Map<String, String> variables) {

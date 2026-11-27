@@ -97,6 +97,8 @@ public final class JobSettingsScreen extends FormScreen {
         bodyW,
         () -> minecraft.gui.setScreen(new CelebrationSettingsScreen(app, this, draft.celebration)));
     toggle("Use vanilla /jobs stats", draft.vanillaJobsStats, 586, () -> draft.vanillaJobsStats = !draft.vanillaJobsStats);
+    action("Public ranking refresh", 0, 622, bodyW,
+        () -> minecraft.gui.setScreen(new PublicDataScreen(app, this)));
     page("Display");
     action(
         "Overlay settings  ›",

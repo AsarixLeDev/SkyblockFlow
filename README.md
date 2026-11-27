@@ -14,11 +14,19 @@ Install Fabric Loader **0.20.1** and Fabric API **0.161.0+26.2** in a Minecraft 
 
 Choose a feature to configure it. Search includes settings inside nested menus. Settings and overlay layouts save when closed; invalid values stay open for correction. Imports, deletion and account authorization require an explicit action.
 
-Download [PUBLIC-BETA-0.0.2](https://github.com/AsarixLeDev/SkyblockFlow/releases/tag/PUBLIC-BETA-0.0.2). The Discord overlay cannot connect in this release while public access is being verified. See [Discord availability](DISCORD-RELEASE.md).
+Download [0.0.3 Beta](https://github.com/AsarixLeDev/SkyblockFlow/releases/tag/SkyblockFlow-0.0.3-beta). The Discord overlay cannot connect in this release while public access is being verified. See [Discord availability](DISCORD-RELEASE.md).
 
-## Unreleased changes
+## 0.0.3 Beta
 
-These source changes are not part of a new release and have not been tested (`tested=false`). The version is unchanged.
+This prerelease is marked **untested (`tested=no`)**. In-game verification is pending.
+
+- **Ability-ready alerts:** recognize decorative lettering and spacing in messages such as “ABATTEUR 2 EST À NOUVEAU DISPONIBLE.”, including copied default rules.
+- **Chat alerts:** opening them from Alarms leads to the same settings as the feature browser.
+- **Sack icons:** hide the tiny item overlays in **Features → Recipe helper → Show sack item icons**.
+- **Crafting-price hover:** market offer selection and ingredient-name work run in the background; hovering reuses cached quotes. Brief cursor passes do not restart price calculations.
+- **Active-job ranking:** refreshes every minute by default. Change the interval (1–60 minutes), or disable the extra refresh, in **Job tracker → Public ranking refresh → Active job**. Server cache and retry delays still apply.
+
+Other available controls:
 
 - **Recipe helper:** turn the entire feature off in **Features → Recipe helper → Enable recipe helper**, or choose **Disable recipe helper** in its gear menu. This also disables its inventory browser, item inspection, materials overlay, crafting-value details and all recipe shortcuts, including R, U, P, G and C. Your pinned recipes and preferences remain saved. Re-enable it from Features.
 - **Chat tabs:** **Features → Chat alerts → Enable chat tabs** turns all tabs and their filtering off together. All messages return to one chat view. Chat alerts, copying and message compression keep their own settings.
@@ -48,7 +56,7 @@ These captures use the existing installed build and combine cached profile stats
 | **Spawner helper** | Highlights activation distance and checks the surrounding 5×5×5 spawning area. Orange warnings mark obstructions and hostile-spawner lighting; other spawners can be exempted. Uses loaded client data. |
 | **Waypoints and maps** | Organizes colored checkpoints into sets and categories, with labels, visibility zones, a minimap, recorded surface maps, copy/offset tools and walking/flying route guidance. [Waypoints guide](WAYPOINTS.md). |
 | **Inventory calculator** | A compact arithmetic bar in inventories and containers, with parentheses, decimal calculations, a scrolling expression and a result that fits the bar. |
-| **Farm sack badges** | A small item icon in the sack’s upper-right corner shows its filter in inventories, containers and the hotbar. |
+| **Farm sack badges** | A small item icon in the sack’s upper-right corner shows its filter in inventories, containers and the hotbar. Disable it in Recipe helper settings. |
 | **Recipe helper** | Can be fully disabled, including its shortcuts. Browse and search items beside your inventory. Check recipes and uses, pin favorites, and scroll the materials checklist inside your inventory. Missing ingredients come first; materials you already have appear last in every checklist. Item hover tooltips include known lore, shop prices and player-market offers. The Buy view shows where an item can be purchased, with unit prices and island sellers. Long tooltips wrap and scroll with the mouse wheel. Craft fills the appropriate table; Shift-click fills the maximum available amount. Matching Excalia search results are selected for you after you click Craft. |
 | **Shop values** | Shows current server-shop prices with job-adjusted unit and stack values, plus the cheapest player-shop seller and highest buyer with merchant names. Sold-out offers are excluded and totals respect listed stock. |
 | **Crafting value** | Shows the cheapest known ingredient cost per item and stack, comparing raw materials, intermediates and compacted forms. Buying the finished item does not lower its crafting value. Hold C (rebindable in Controls) to see ingredient icons, quantities and costs. |
@@ -86,7 +94,7 @@ Verified styles are cached locally and your own appearance is available at launc
 
 Excalia Season 3's public API supplies published job rankings (including fishing), island power rankings and current shop prices. Bossbars remain the source for live XP sessions. The API currently lists the top 15 players per job, the top 20 fishing players and the top 25 islands by power. For other players, **Measure** offers the usual **Run /…** commands; each command waits for your click. Island membership can be verified from a known island's public details. If your island is not identified, choose **Identify my island** and run the displayed `/is info` command, or browse `/is visits`.
 
-**Features → Leaderboards → Public data settings** (also available in **Shop values**) controls rankings, market quotes and server-shop prices separately. Recent snapshots are cached locally; refreshes respect endpoint cache times and rate limits. Confirmed player-shop purchases and nearby “Out of Stock” signs update the local stock estimate and move an emptied seller out of the tooltip, using cached alternatives without an extra API request. Sign matching uses the seller, item and unit price; ambiguous matches are left unchanged. Temporary failures keep recent prices marked as cached. After ten minutes, player-shop quotes disappear and server prices fall back to the bundled reference.
+**Features → Leaderboards → Public data settings** (also available in **Shop values**) controls rankings, market quotes and server-shop prices separately. Recent snapshots are cached locally. While a job session is active, its ranking feed refreshes every minute by default; the **Active job** tab sets a 1–60 minute interval. Other feeds use their normal ten-minute cache. API retry delays still apply, and the server may return the same cached ranking. Bossbar XP remains authoritative. Confirmed player-shop purchases and nearby “Out of Stock” signs update the local stock estimate and move an emptied seller out of the tooltip, using cached alternatives without an extra API request. Sign matching uses the seller, item and unit price; ambiguous matches are left unchanged. Temporary failures keep recent prices marked as cached. After ten minutes, player-shop quotes disappear and server prices fall back to the bundled reference.
 
 **Market buy** is the lowest available selling price; **Market sell** is the highest available buyback price. Quotes show the merchant, unit price and available stack total. The API does not provide shop coordinates or island IDs, and prices or stock may change before you arrive. Ambiguous item variants are omitted.
 

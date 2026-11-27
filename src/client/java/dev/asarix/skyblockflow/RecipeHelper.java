@@ -594,6 +594,23 @@ public final class RecipeHelper {
     return id.substring(id.lastIndexOf(':') + 1).replace('_', ' ');
   }
 
+  // Language instances are replaced on reload. Capture this instance, never consult Minecraft on a worker.
+  java.util.function.Function<String, String> pricingNames() {
+    var language = net.minecraft.locale.Language.getInstance();
+    return id -> {
+      var known = season.items().get(id);
+      if (known != null && !known.name().isBlank()
+          && !(id.startsWith("minecraft:") && known.name().equals(id.substring(10)))) return known.name();
+      if (id.startsWith("minecraft:")) {
+        String suffix = id.substring(10).replace('/', '.');
+        String item = "item.minecraft." + suffix, block = "block.minecraft." + suffix;
+        if (language.has(item)) return language.getOrDefault(item);
+        if (language.has(block)) return language.getOrDefault(block);
+      }
+      return id.substring(id.lastIndexOf(':') + 1).replace('_', ' ');
+    };
+  }
+
   public String recipeLookup(String item) {
     if (!item.startsWith("oraxen:")) return item;
     return item.replaceFirst("_(?:peu_commun|rare|epique|legendaire|astronomique)$", "_commun");

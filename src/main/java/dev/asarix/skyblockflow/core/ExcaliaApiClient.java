@@ -76,7 +76,13 @@ public final class ExcaliaApiClient implements AutoCloseable {
     if(slot!=null && !slot.busy && slot.error.isEmpty() && slot.snapshot!=null
         && System.currentTimeMillis()-slot.snapshot.receivedAt()>=60_000)slot.next=0;
   }
-  public synchronized void refresh(Feed feed){allowManualRefresh(feeds.get(feed));request(feed);}
+  public synchronized void refresh(Feed feed) { refresh(feed, 60_000); }
+  public synchronized void refresh(Feed feed, long intervalMs) {
+    var slot = feeds.get(feed);
+    if (slot.snapshot != null && System.currentTimeMillis() - slot.snapshot.receivedAt() < Math.max(60_000, intervalMs)) return;
+    allowManualRefresh(slot);
+    request(feed);
+  }
   public synchronized void refreshDetail(UUID id){allowManualRefresh(details.get(id));requestDetail(id);}
   public void request(Feed feed) {
     var slot = feeds.get(feed);

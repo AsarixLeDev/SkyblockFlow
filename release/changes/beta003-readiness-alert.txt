@@ -1,0 +1,4 @@
+Type: Fix
+Author: Asarix
+Summary: Recognize formatted ability-ready messages in copied alerts.
+Details: Normalize decorative letters, spacing and accents for the standard readiness template without relying on a factory rule ID. Custom templates and regular expressions keep their matching behavior.

@@ -39,13 +39,14 @@ def main():
     props = git("show", args.commit + ":gradle.properties")
     require(f"mod_version={expected}" in props.splitlines(), "Version differs from fabric build")
     publishing = args.ref.startswith("refs/tags/")
-    if args.ref == "refs/heads/main" or publishing:
+    if args.ref == "refs/heads/main" or publishing and mode != "beta":
         require(tested == "yes", "Untested changes belong on a branch")
     if publishing:
         require(mode != "dev", "A dev push cannot publish")
         tag = "SkyblockFlow-" + ("PUBLIC-" + version if mode == "public" else expected)
         require(args.ref == "refs/tags/" + tag, "Release tag differs from declaration")
-        require(subprocess.run(["git","merge-base","--is-ancestor",args.commit,"origin/main"]).returncode == 0, "Release commit must be on main")
+        if tested == "yes" or mode == "public":
+            require(subprocess.run(["git","merge-base","--is-ancestor",args.commit,"origin/main"]).returncode == 0, "Release commit must be on main")
         if mode == "beta":
             series, n = version.rsplit(".",1)
             others = git("tag","--list",f"SkyblockFlow-{series}.*-beta").splitlines()
@@ -65,6 +66,8 @@ def main():
         require(selected,"Release has no change entries")
         title = f"SkyblockFlow {version} {mode.title()}"
         notes = ["# " + title, ""]
+        if tested == "no":
+            notes.extend(["> Untested beta (tested=no). In-game verification is still pending.", ""])
         details = ["Format: 1",""]
         for f in selected:
             kind, author, summary, _ = records[f]

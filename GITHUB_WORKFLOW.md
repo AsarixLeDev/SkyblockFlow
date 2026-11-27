@@ -5,10 +5,10 @@ Obtain the developer's explicit version, tested flag (yes or no), and mode (dev,
 | Mode | Version | Destination |
 | --- | --- | --- |
 | dev | x.x.n | Development work. No GitHub release. |
-| beta | x.x.n | Tested revision. Publish a GitHub prerelease tagged SkyblockFlow-x.x.n-beta. Start n at 1 and increment once per published beta for the series. |
+| beta | x.x.n | Publish a GitHub prerelease tagged SkyblockFlow-x.x.n-beta. Start n at 1 and increment once per published beta for the series. |
 | public | x.x | Tested revision. Publish a release tagged SkyblockFlow-PUBLIC-x.x. |
 
-Use a feature branch whenever any modification is untested. A complete declaration with tested=no permits a branch test build and branch push only. Main requires tested=yes, evidence covering all changes and the developer's confirmation for the exact code being promoted. A beta or public tag requires the tested revision on main. Never publish dev or untested builds. Install the version-controlled pre-push hook with `git config core.hooksPath .githooks`. Configure main branch protection to require the validate status check from Release policy before merging. A local hook cannot enforce repository permissions.
+Use a feature branch whenever any modification is untested. A complete declaration with tested=no permits a branch test build and branch push. When the developer explicitly requests an untested beta, publish it from that feature branch as a prerelease with a visible untested notice. Main requires tested=yes, evidence covering all changes and the developer's confirmation for the exact code being promoted. A tested beta or public tag requires the tested revision on main. Public releases require tested=yes; dev builds cannot be published. An explicitly requested untested beta stays on its feature branch and retains tested=no. Install the version-controlled pre-push hook with `git config core.hooksPath .githooks`. Configure main branch protection to require the validate status check from Release policy before merging. A local hook cannot enforce repository permissions.
 
 Store one UTF-8 text record per change in release/changes/<stable-id>.txt. Use the fields Type, Author, Summary, Details in order. Types are Feature, Fix, Improvement, Performance, Refactor. Write a short standalone summary and an optional detail, continuing a long detail on indented lines. Keep published records immutable. Credit the developer for every entry. Dev changes enter the ledger even though dev never publishes a release.
 

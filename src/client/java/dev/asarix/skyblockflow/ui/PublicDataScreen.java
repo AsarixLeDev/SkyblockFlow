@@ -12,6 +12,7 @@ public final class PublicDataScreen extends FormScreen {
   }
   protected String description() { return "Excalia Season 3 · rankings and prices from excalia.fr"; }
   protected void buildForm() {
+    page("Sources");
     toggle("Public jobs, island & balance ranks", draft.leaderboards, 0, () -> draft.leaderboards = !draft.leaderboards);
     toggle("Player-shop buy & sell quotes", draft.market, 36, () -> draft.market = !draft.market);
     toggle("Current server-shop prices", draft.shopPrices, 72, () -> draft.shopPrices = !draft.shopPrices);
@@ -27,8 +28,16 @@ public final class PublicDataScreen extends FormScreen {
       app.save(); app.excaliaApi.refreshRankings(); notice = app.excaliaApi.refreshPrices();
     });
     label("Refreshes respect Excalia's cache and rate limits.", 0, 326);
+    page("Active job");
+    toggle("Automatically refresh active job ranking", draft.refreshActiveJob, 0,
+        () -> draft.refreshActiveJob = !draft.refreshActiveJob);
+    field("jobMinutes", "Refresh interval (minutes, 1–60)", Integer.toString(draft.activeJobMinutes), 38);
+    label("Default: every minute while a job session is active.", 0, 84);
+    label("Only the most recently trained job is refreshed more often.", 0, 106);
+    label("Server cache and retry delays still apply.", 0, 128);
   }
   protected void commit() {
+    draft.activeJobMinutes = (int) number("jobMinutes", 1, 60);
     app.store.config.tools.publicData = ConfigStore.copy(draft, ExcaliaApiSettings.class);
     if (app.save()) onClose();
   }

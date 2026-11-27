@@ -1,0 +1,4 @@
+Type: Feature
+Author: Asarix
+Summary: Allow sack item icons to be hidden.
+Details: Recipe helper settings include a saved Show sack item icons toggle for inventory, container and hotbar overlays.

@@ -1,0 +1,4 @@
+Type: Feature
+Author: Asarix
+Summary: Refresh the active job ranking automatically every minute.
+Details: Set a 1–60 minute interval in public ranking settings, or disable the extra refresh. The most recently trained job uses the faster cadence while other feeds retain normal caching. Server rate limits and error backoff are respected.

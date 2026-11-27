@@ -22,7 +22,7 @@ public final class SackBadges {
 
   public static void draw(GuiGraphicsExtractor g, ItemStack sack, int x, int y) {
     var app = SkyblockFlowClient.INSTANCE;
-    if (app == null || app.recipes == null || sack.isEmpty()) return;
+    if (app == null || app.recipes == null || !app.recipes.enabled() || !app.recipes.settings().sackIcons || sack.isEmpty()) return;
     var model = sack.get(DataComponents.ITEM_MODEL);
     var lore = sack.get(DataComponents.LORE);
     if (lore == null) return;

@@ -141,7 +141,7 @@ gradle.taskGraph.whenReady { graph ->
             !(v ==~ (m == 'public' ? /\d+\.\d+/ : /\d+\.\d+\.\d+/)) ||
             v + (m == 'public' ? '' : '-' + m) != project.version.toString())
             throw new GradleException('Supply the developer FLOW_VERSION, FLOW_TESTED and FLOW_MODE matching mod_version.')
-        if (graph.hasTask(':publicRelease') && (t != 'yes' || m == 'dev'))
-            throw new GradleException('Publication requires a tested beta or public declaration.')
+        if (graph.hasTask(':publicRelease') && (m == 'dev' || m == 'public' && t != 'yes'))
+            throw new GradleException('Publication requires a beta declaration or a tested public declaration.')
     }
 }

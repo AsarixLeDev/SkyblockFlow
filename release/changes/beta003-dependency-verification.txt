@@ -1,0 +1,4 @@
+Type: Refactor
+Author: Asarix
+Summary: Verify the current Minecraft FreeType artifacts.
+Details: Add checksums for the Mojang FreeType patch, verified against the official version manifest and library origin.
