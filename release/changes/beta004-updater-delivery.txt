@@ -1,0 +1,4 @@
+Type: Improvement
+Author: Asarix
+Summary: Deliver the alert-audio correction through the in-game updater.
+Details: Version 0.0.4 Beta is newer than both 0.0.3 Beta builds, so existing installations can download it in game with beta suggestions enabled. It includes the correction that keeps selected Minecraft alert sounds playing through other notifications, previews and celebration completion. Player verification remains pending (tested=no).

@@ -14,13 +14,13 @@ Install Fabric Loader **0.20.1** and Fabric API **0.161.0+26.2** in a Minecraft 
 
 Choose a feature to configure it. Search includes settings inside nested menus. Settings and overlay layouts save when closed; invalid values stay open for correction. Imports, deletion and account authorization require an explicit action.
 
-Download [0.0.3 Beta](https://github.com/AsarixLeDev/SkyblockFlow/releases/tag/SkyblockFlow-0.0.3-beta). The Discord overlay cannot connect in this release while public access is being verified. See [Discord availability](DISCORD-RELEASE.md).
+Download [0.0.4 Beta](https://github.com/AsarixLeDev/SkyblockFlow/releases/tag/SkyblockFlow-0.0.4-beta). The Discord overlay cannot connect in this release while public access is being verified. See [Discord availability](DISCORD-RELEASE.md).
 
-## 0.0.3 Beta
+## 0.0.4 Beta
 
 This prerelease is marked **untested (`tested=no`)**. Player verification is pending.
 
-**Revised 27 November 2026:** selected Minecraft alert sounds can now finish when another notification arrives. If you installed the earlier 0.0.3 Beta, download the JAR again and replace it; the version number is unchanged.
+**Updating from 0.0.3 Beta:** this version delivers the alert-audio correction through the in-game installer. Leave beta suggestions enabled and check for updates. Selected Minecraft alert sounds can finish when another notification arrives; previews and celebrations no longer interrupt them.
 
 - **Ability-ready alerts:** recognize decorative lettering and spacing in messages such as “ABATTEUR 2 EST À NOUVEAU DISPONIBLE.”, including copied default rules.
 - **Chat alerts:** opening them from Alarms leads to the same settings as the feature browser.
